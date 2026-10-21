@@ -81,6 +81,12 @@ quit_fb2k() {
     return 1
 }
 
+# Every quit that matters: when foobar2000 does not go away nothing else may touch the profile. The exit runs the
+# cleanup, which sees the same failure, keeps the backup and does not restore over a running application.
+quit_or_stop() {
+    quit_fb2k || { fail "$1: foobar2000 did not quit; stopping before anything else changes the profile"; exit 3; }
+}
+
 stop_stub() {
     [ -n "$STUB_PID" ] && kill "$STUB_PID" 2>/dev/null && wait "$STUB_PID" 2>/dev/null
     STUB_PID=""
@@ -164,13 +170,13 @@ start_run() {
     done
     if [ ! -s "$log" ]; then
         fail "$name: no autotest log after 120 s"
-        quit_fb2k
+        quit_or_stop "$name"
         return 1
     fi
     local pid; pid="$(fb2k_pid)"
     section "Run $name: loaded images and log"
     lsof -p "$pid" 2>/dev/null | grep -E 'foo_component_updater_mac' | awk '{print $NF}' | sort -u | fence
-    quit_fb2k || fail "$name: foobar2000 did not quit"
+    quit_or_stop "$name"
     cp "$log" "$WORK/run-$name.json"
     fence < "$log"
 }
@@ -417,7 +423,7 @@ run_m2() {
         [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after eight refused packages" || fail "m2 refuse: pending/foo_abx exists"
         say "INFO backup.json on disk: $(cat "$PROFILE/foo_component_updater_mac/backup/foo_abx/backup.json")"
     fi
-    quit_fb2k || fail "m2: foobar2000 did not quit"
+    quit_or_stop m2
 
     rm -rf "$PROFILE/user-components/foo_abx" && mkdir "$PROFILE/user-components/foo_abx" && cp -R "$WORK/orig/mac/foo_abx.component" "$PROFILE/user-components/foo_abx/"
     say "INFO foo_abx replaced by the original Developer ID bundle: $(codesign -dv "$installed" 2>&1 | grep TeamIdentifier)"
@@ -431,7 +437,7 @@ run_m2() {
             fail "m2 team: staged bundle is not as expected"
         fi
     fi
-    quit_fb2k || fail "m2: foobar2000 did not quit"
+    quit_or_stop m2
     section "m2: requests the stub saw"
     fence < "$WORK/stub-m2.log"
 }
