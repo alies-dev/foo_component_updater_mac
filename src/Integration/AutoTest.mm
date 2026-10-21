@@ -400,10 +400,11 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             attempt("restore", "");
             next = "refuse";
         } else if (scenario == "refuse") {
-            for (char const* name : {"tampered", "wrongid", "zipslip", "nomac", "notzip", "missing"}) attempt(name, pkg(name));
+            for (char const* name : {"tampered", "wrongid", "zipslip", "nomac", "notzip", "missing", "linkout"}) attempt(name, pkg(name));
             *results = RunUpdateCheck(installed, abort);
         } else {
             attempt("other_developer", pkg("good"));
+            attempt("forged_team", pkg("forgedteam"));
             attempt("same_developer", pkg("devid"));
         }
         fb2k::inMainThread([=] {

@@ -19,7 +19,7 @@
 # M2 runs four starts of foobar2000 (the first three chained by main_restart() calls of the component itself):
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
 #   m2-restore   the new version runs (Components list, mapped binary); Restore Previous stages the backup; restart
-#   m2-refuse    the old version runs again, the backup holds the new one; six bad packages are refused
+#   m2-refuse    the old version runs again, the backup holds the new one; seven bad packages are refused
 #   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
@@ -302,7 +302,8 @@ run_against_stub() {
 sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 # Packages for the stub: good is the catalog's foo_abx re-signed ad hoc like the installed one (a restore of an ad hoc
-# backup over a Developer ID bundle is refused by design), devid the original, the rest are broken in one way each.
+# backup over a Developer ID bundle is refused by design), devid the original, forgedteam an ad hoc one whose code directory
+# claims the Team ID of devid, the rest are broken in one way each.
 m2_packages() {
     local pk="$WORK/pkgs"
     mkdir -p "$pk"
@@ -317,7 +318,23 @@ open(sys.argv[1], "wb").write(d.replace(b"2.2.3\x00", b"2.2.9\x00"))
 PY
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.other" "$WORK/wrongid/mac/foo_abx.component/Contents/Info.plist"
     codesign --force --sign - "$WORK/wrongid/mac/foo_abx.component" >/dev/null 2>&1 || return 1
-    for n in good tampered wrongid; do (cd "$WORK/$n" && zip -qry "$pk/$n.fb2k-component" mac) || return 1; done
+    ditto "$WORK/good" "$WORK/linkout" && ln -s /etc "$WORK/linkout/mac/foo_abx.component/Contents/Resources/outside" || return 1
+    ditto "$WORK/orig" "$WORK/forgedteam" && codesign --force --sign - --identifier com.foobar2000.foo-abxXXXXXXXXXXX "$WORK/forgedteam/mac/foo_abx.component" >/dev/null 2>&1 || return 1
+    # Pad the identifier by 11 bytes, then overwrite the padding with the NUL and "9UF72C5LAW\0" (teamOffset) so nothing else moves.
+    python3 - "$WORK/forgedteam/mac/foo_abx.component/Contents/MacOS/foo_abx" <<'PY'
+import struct, sys
+d = bytearray(open(sys.argv[1], "rb").read())
+i = d.find(b"\xfa\xde\x0c\x02")
+while i >= 0:
+    ident, = struct.unpack(">I", d[i + 20:i + 24])
+    assert d[i + ident:i + ident + 34] == b"com.foobar2000.foo-abx" + b"X" * 11 + b"\0"
+    d[i + ident + 22:i + ident + 34] = b"\0" + b"9UF72C5LAW\0"
+    d[i + 48:i + 52] = struct.pack(">I", ident + 23)
+    i = d.find(b"\xfa\xde\x0c\x02", i + 1)
+open(sys.argv[1], "wb").write(d)
+PY
+    [ "$(codesign -dv "$WORK/forgedteam/mac/foo_abx.component" 2>&1 | grep -c 'TeamIdentifier=9UF72C5LAW')" = 1 ] && codesign --verify --strict --deep "$WORK/forgedteam/mac/foo_abx.component" || return 1
+    for n in good tampered wrongid linkout forgedteam; do (cd "$WORK/$n" && zip -qry "$pk/$n.fb2k-component" mac) || return 1; done
     (cd "$WORK/good/mac" && zip -qry "$pk/nomac.fb2k-component" foo_abx.component) || return 1
     python3 - "$pk/good.fb2k-component" "$pk/zipslip.fb2k-component" <<'PY'
 import shutil, sys, zipfile
@@ -387,7 +404,7 @@ run_m2() {
     # Restart 2: the backup is back, and the backup holds the newer version.
     if m2_wait refuse; then
         check_run m2-refuse "$previous"; m2_disk refuse "$old_sha"
-        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after six refused packages" || fail "m2 refuse: pending/foo_abx exists"
+        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after seven refused packages" || fail "m2 refuse: pending/foo_abx exists"
         say "INFO backup.json on disk: $(cat "$PROFILE/foo_component_updater_mac/backup/foo_abx/backup.json")"
     fi
     quit_fb2k || fail "m2: foobar2000 did not quit"

@@ -122,7 +122,7 @@ def m2(run, log, previous_pid):
         check("after the restart the Components list shows 2.2.1 again and the backup holds 2.2.3",
               (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.1", False, "2.2.3"), before)
         for name, text in (("tampered", "code signature"), ("wrongid", "bundle identifier"), ("zipslip", "unsafe path"), ("nomac", "no macOS build"),
-                           ("notzip", "not a valid package"), ("missing", "download failed")):
+                           ("notzip", "not a valid package"), ("missing", "download failed"), ("linkout", "link that points outside")):
             refused(log, name, text)
         check("nothing staged, installed version and backup unchanged",
               (after["staged"], after["installed_version"], after["backup_version"]) == (False, "2.2.1", "2.2.3"), after)
@@ -131,6 +131,7 @@ def m2(run, log, previous_pid):
               (menu["title"], menu["enabled"], menu["title_without_backup"], menu["enabled_without_backup"]) == ("Restore Previous (2.2.3)", True, "Restore Previous", False), menu)
     elif run == "m2-team":
         refused(log, "other_developer", "different developer")
+        refused(log, "forged_team", "different developer")
         check("a package from the same Team ID is staged", o["same_developer"]["ok"] is True and after["staged"] is True, log)
     sys.exit(1 if failures else 0)
 
