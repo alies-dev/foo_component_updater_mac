@@ -123,12 +123,27 @@ int main() {
         extra = fixture("../../Resources/extra_components.json");
     }
     std::vector<RepositoryMappingEntry> builtIn;
-    CHECK(parseRegistryJson(extra, builtIn) && builtIn.size() == 11, "11 foo_jl entries");
-    bool allJenda = true;
+    CHECK(parseRegistryJson(extra, builtIn) && builtIn.size() == 16, "11 foo_jl entries and 5 others");
+    size_t jenda = 0;
     for (auto const& e : builtIn) {
-        allJenda &= e.source == "github" && e.owner == "JendaT" && e.repo == "fb2k-components-mac-suite" && e.dllName.rfind("foo_jl_", 0) == 0;
+        bool isJl = e.dllName.rfind("foo_jl_", 0) == 0;
+        jenda += isJl;
+        CHECK(e.source == "github" && (e.owner == "JendaT" && e.repo == "fb2k-components-mac-suite") == isJl, e.dllName.c_str());
     }
-    CHECK(allJenda, "all point at JendaT/fb2k-components-mac-suite");
+    CHECK_EQ(jenda, 11, "foo_jl_* all point at JendaT/fb2k-components-mac-suite");
+    struct Extra { char const* dll; char const* owner; char const* repo; } extras[] = {
+        {"foo_mac_scrobble", "avelytchko", "foo_mac_scrobble"}, {"foo_vis_projectm_mac", "Stwarf", "foo_vis_projectm_mac"},
+        {"foo_cyan_leaf", "CyanLeafcomponent", "cyan-leaf-downloads"}, {"foo_vis_projectMacOS", "gabitoesmiapodo", "projectMacOS"},
+        {"foo_richtext_mac", "seongbin", "foo_richtext_mac"},
+    };
+    for (auto const& x : extras) {
+        RepositoryMappingEntry found;
+        for (auto const& e : builtIn) if (e.dllName == x.dll) found = e;
+        CHECK(found.owner == x.owner && found.repo == x.repo, x.dll);
+        SourceLists one;
+        one.builtIn = builtIn;
+        CHECK(resolveSource(x.dll, {false, ""}, one).origin == SourceOrigin::BuiltIn, x.dll);
+    }
     SourceLists real;
     real.builtIn = builtIn;
     for (char const* name : {"foo_jl_spectrum", "foo_jl_vectorscope", "foo_jl_simplaylist", "foo_jl_scrobble", "foo_jl_wave_seekbar"}) {
