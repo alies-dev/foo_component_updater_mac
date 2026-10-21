@@ -74,7 +74,16 @@ uint64_t writtenBytes(NSString *dir) {
     return total;
 }
 
-// Runs a tool and waits for it. With `watch`, the tool is killed as soon as it has written more than the package size cap
+// SIGKILL, then wait until the child is gone: a wait cut short by a signal is retried, so no zombie outlives the cleanup of the
+// work folder. Any other error (ECHILD) means there is nothing left to wait for.
+void killAndReap(pid_t pid) {
+    kill(pid, SIGKILL);
+    int status;
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+    }
+}
+
+// Runs a tool and waits for it. With `watch`, the tool is killed once a poll finds more than the package size cap
 // below that folder: the zip's own size fields (checked before) are not what ditto follows. Abort kills it too.
 void run(std::vector<std::string> const& args, abort_callback& abort, char const *failure, NSString *watch = nil) {
     std::vector<char *> argv;
@@ -88,8 +97,7 @@ void run(std::vector<std::string> const& args, abort_callback& abort, char const
     pid_t waited;
     while ((waited = waitpid(pid, &status, WNOHANG)) == 0 || (waited < 0 && errno == EINTR)) {
         if (abort.is_aborting() || overCap()) {
-            kill(pid, SIGKILL);
-            waitpid(pid, &status, 0);
+            killAndReap(pid);
             abort.check();
             throw tooBig();
         }
