@@ -120,7 +120,6 @@ std::string installBlockReason(bool updateAvailable, std::string const& dllName,
     if (staged) return "Installed, restart foobar2000 to finish";
     if (!updateAvailable) return "No update available";
     if (dllName == "Core") return "Built in components are updated with foobar2000";
-    if (dllName == "foo_component_updater_mac") return "Self update arrives in a later version";
 
     std::string asset = assetName;
     std::transform(asset.begin(), asset.end(), asset.begin(), [](unsigned char c) { return std::tolower(c); });

@@ -172,7 +172,7 @@ int main() {
     CHECK(installBlockReason(true, "foo_x", url, "FOO_X.FB2K-COMPONENT", false).empty(), "extension is case insensitive");
     CHECK(!installBlockReason(false, "foo_x", url, "foo_x.fb2k-component", false).empty(), "no update");
     CHECK(!installBlockReason(true, "Core", url, "foo_x.fb2k-component", false).empty(), "built in");
-    CHECK(mentions(installBlockReason(true, "foo_component_updater_mac", url, "foo_x.fb2k-component", false), "later version"), "self update");
+    CHECK(installBlockReason(true, "foo_component_updater_mac", url, "foo_component_updater_mac.fb2k-component", false).empty(), "self update is installable like any other");
     CHECK(mentions(installBlockReason(true, "foo_x", url, "foo_x.fb2k-component", true), "restart"), "already staged");
     CHECK(mentions(installBlockReason(true, "foo_x", "", "", false), "no package"), "page only source");
     CHECK(!installBlockReason(true, "foo_x", "http://example.org/foo_x.fb2k-component", "foo_x.fb2k-component", false).empty(), "http link");
