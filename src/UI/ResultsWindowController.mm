@@ -42,7 +42,7 @@ NSString *statusText(UpdateStatus s) {
 @property (copy) NSString *component, *installed, *latest, *status, *source, *tooltip, *releaseUrl;
 @property (copy) NSString *name, *blockReason, *backupVersion; // file name, why not installable ("" when it is), backup version ("" when none)
 @property UpdateStatus statusCode;
-@property BOOL installable, checked, staged, failed;
+@property BOOL staged, failed;
 @end
 @implementation FCUResultRow
 @end
@@ -331,8 +331,6 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.name = ns(r->dllName);
         row.staged = fcu::isStaged(r->dllName);
         row.blockReason = ns(fcu::installBlockReason(r->status == UpdateStatus::UpdateAvailable, r->dllName, r->downloadUrl, r->assetName, row.staged));
-        row.installable = row.blockReason.length == 0;
-        row.checked = row.installable && [_checked containsObject:row.name];
         std::string backup;
         row.backupVersion = r->dllName != "Core" && fcu::backupVersion(r->dllName, backup) ? ns(backup) : @"";
         if (row.staged) {
@@ -379,8 +377,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     NSInteger index = [_table rowForView:sender];
     if (index < 0 || index >= (NSInteger)_rows.count) return;
     FCUResultRow *row = _rows[index];
-    row.checked = sender.state == NSControlStateValueOn;
-    if (row.checked) [_checked addObject:row.name]; else [_checked removeObject:row.name];
+    if (sender.state == NSControlStateValueOn) [_checked addObject:row.name]; else [_checked removeObject:row.name];
     [self updateControls];
 }
 
@@ -474,8 +471,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
 
 - (void)debugCheckFirstInstallable {
     for (FCUResultRow *row in _rows) {
-        if (!row.installable) continue;
-        row.checked = YES;
+        if (row.blockReason.length != 0) continue;
         [_checked addObject:row.name];
         [_table reloadData];
         [self updateControls];
@@ -524,8 +520,9 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
             box = [NSButton checkboxWithTitle:@"" target:self action:@selector(toggleUpdate:)];
             box.identifier = ident;
         }
-        box.enabled = row.installable;
-        box.state = row.checked ? NSControlStateValueOn : NSControlStateValueOff;
+        BOOL installable = row.blockReason.length == 0;
+        box.enabled = installable;
+        box.state = installable && [_checked containsObject:row.name] ? NSControlStateValueOn : NSControlStateValueOff;
         box.toolTip = row.blockReason.length ? row.blockReason : @"Install this update";
         return box;
     }

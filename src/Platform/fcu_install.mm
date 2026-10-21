@@ -4,7 +4,6 @@
 #include <climits>
 #include <ctime>
 #include <fts.h>
-#include <functional>
 #include <spawn.h>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -26,13 +25,9 @@ namespace {
 
 constexpr uint64_t kMaxDownloadBytes = 100ull * 1024 * 1024;
 
-// The message is shown to the user as is.
-struct Refused : std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
+// Exceptions thrown here carry the message that is shown to the user as is.
 void require(bool ok, char const *message) {
-    if (!ok) throw Refused(message);
+    if (!ok) throw std::runtime_error(message);
 }
 
 NSFileManager *fm() { return NSFileManager.defaultManager; }
@@ -117,7 +112,8 @@ struct Job {
 
 // Calls visit for every entry below root (folders before their content). Whatever fts could not read (a folder
 // without read permission, a failing stat, an error that ends the walk) is a refusal: unread content is unexamined.
-void walkTree(NSString *root, std::function<void(FTSENT const *)> const& visit) {
+template <class F>
+void walkTree(NSString *root, F const& visit) {
     char *roots[] = {const_cast<char *>(root.fileSystemRepresentation), nullptr};
     FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
     require(fts != nullptr, "Could not read the extracted package.");
@@ -129,7 +125,7 @@ void walkTree(NSString *root, std::function<void(FTSENT const *)> const& visit) 
     errno = 0;
     while (FTSENT *e = fts_read(fts)) {
         if (e->fts_info == FTS_DNR || e->fts_info == FTS_ERR || e->fts_info == FTS_NS) {
-            throw Refused(std::string("The package contains a folder or file that cannot be examined: ") + e->fts_name);
+            throw std::runtime_error(std::string("The package contains a folder or file that cannot be examined: ") + e->fts_name);
         }
         if (e->fts_info != FTS_DP) visit(e);
     }
@@ -147,10 +143,10 @@ void sanitize(NSString *bundle) {
         if (e->fts_info == FTS_SL || e->fts_info == FTS_SLNONE) {
             char target[PATH_MAX];
             if (!realpath(e->fts_path, target) || (strcmp(target, realRoot) != 0 && strncmp(target, prefix.c_str(), prefix.size()) != 0)) {
-                throw Refused(std::string("The package contains a link that points outside the component: ") + e->fts_name);
+                throw std::runtime_error(std::string("The package contains a link that points outside the component: ") + e->fts_name);
             }
         } else if (e->fts_info != FTS_D && e->fts_info != FTS_F) {
-            throw Refused(std::string("The package contains a file of an unsupported type: ") + e->fts_name);
+            throw std::runtime_error(std::string("The package contains a file of an unsupported type: ") + e->fts_name);
         }
         removexattr(e->fts_path, "com.apple.quarantine", XATTR_NOFOLLOW);
         require(getxattr(e->fts_path, "com.apple.quarantine", nullptr, 0, 0, XATTR_NOFOLLOW) < 0, "The quarantine flag could not be removed from the package.");
@@ -192,11 +188,11 @@ void verifyIdentity(NSString *candidate, NSString *installed) {
     OSStatus status = SecStaticCodeCheckValidity((__bridge SecStaticCodeRef)code,
         kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode, (__bridge SecRequirementRef)holder);
     if (status == errSecCSReqFailed) {
-        throw Refused(std::string("The new version is signed by a different developer than the installed one (Team ID ") + team.UTF8String + ").");
+        throw std::runtime_error(std::string("The new version is signed by a different developer than the installed one (Team ID ") + team.UTF8String + ").");
     }
     if (status != errSecSuccess) {
         NSString *why = CFBridgingRelease(SecCopyErrorMessageString(status, nullptr));
-        throw Refused(std::string("The code signature of the new version is not valid (") + (why ? why.UTF8String : "unknown error") + ").");
+        throw std::runtime_error(std::string("The code signature of the new version is not valid (") + (why ? why.UTF8String : "unknown error") + ").");
     }
     require([bundleId(candidate) isEqualToString:bundleId(installed)], "The new version has a different bundle identifier than the installed one.");
 }
@@ -236,8 +232,9 @@ void requireOnlyListed(NSString *dir, std::vector<std::string> const& listed) {
     size_t const skip = strlen(dir.fileSystemRepresentation) + 1;
     walkTree(dir, [&](FTSENT const *e) {
         if (e->fts_level == 0) return;
-        if (![allowed containsObject:[ns(e->fts_path + skip) precomposedStringWithCanonicalMapping]]) {
-            throw Refused(std::string("The package contains a file that is not in its own listing: ") + (e->fts_path + skip));
+        NSString *path = [NSString stringWithUTF8String:e->fts_path + skip]; // nil when the name is not UTF-8: never listed
+        if (![allowed containsObject:[path precomposedStringWithCanonicalMapping]]) {
+            throw std::runtime_error(std::string("The package contains a file that is not in its own listing: ") + (e->fts_path + skip));
         }
     });
 }
@@ -259,18 +256,18 @@ void finish(Job const& job, std::string const& installedVersion, abort_callback&
     bool hadPending = lstat(target.fileSystemRepresentation, &st) == 0;
     if (hadPending) {
         if (lstat(aside.fileSystemRepresentation, &st) == 0) {
-            throw Refused(std::string("An earlier pending entry was left at ") + aside.fileSystemRepresentation + "; move it away first.");
+            throw std::runtime_error(std::string("An earlier pending entry was left at ") + aside.fileSystemRepresentation + "; move it away first.");
         }
         require(rename(target.fileSystemRepresentation, aside.fileSystemRepresentation) == 0, "Could not stage the new version.");
     }
     auto putBack = [&](char const *why) {
         if (hadPending && rename(aside.fileSystemRepresentation, target.fileSystemRepresentation) != 0) {
-            throw Refused(std::string(why) + " The previous pending entry could not be put back and was left at " + aside.fileSystemRepresentation + ".");
+            throw std::runtime_error(std::string(why) + " The previous pending entry could not be put back and was left at " + aside.fileSystemRepresentation + ".");
         }
     };
     if (rename(job.staged().stringByDeletingLastPathComponent.fileSystemRepresentation, target.fileSystemRepresentation) != 0) {
         putBack("Could not stage the new version.");
-        throw Refused("Could not stage the new version.");
+        throw std::runtime_error("Could not stage the new version.");
     }
     try {
         commitBackup(job, fresh);
@@ -282,7 +279,8 @@ void finish(Job const& job, std::string const& installedVersion, abort_callback&
     if (hadPending) [fm() removeItemAtPath:aside error:nil];
 }
 
-InstallOutcome guarded(std::function<void()> const& body) {
+template <class F>
+InstallOutcome guarded(F const& body) {
     InstallOutcome out;
     @autoreleasepool {
         try {
@@ -306,20 +304,20 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
         try {
             httpDownload(url, zip.fileSystemRepresentation, kMaxDownloadBytes, abort);
         } catch (std::runtime_error const& e) {
-            throw Refused(std::string("The download failed: ") + e.what());
+            throw std::runtime_error(std::string("The download failed: ") + e.what());
         }
 
         NSData *bytes = [NSData dataWithContentsOfFile:zip options:NSDataReadingMappedAlways error:nil];
         require(bytes != nil, "Could not read the download.");
         PackageCheck check = checkPackageLayout(std::string_view(static_cast<char const *>(bytes.bytes), bytes.length), name);
-        if (!check.ok) throw Refused(check.error);
+        if (!check.ok) throw std::runtime_error(check.error);
 
         NSString *extracted = join(job.work, @"x");
         run({"/usr/bin/ditto", "-x", "-k", "--noqtn", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort, "Could not extract the package.");
         requireOnlyListed(extracted, check.entries);
         // A zip can hold links: both levels must be real folders before anything is moved out of them.
         NSString *source = join(join(extracted, @"mac"), ns(name + ".component"));
-        if (!isRealDirectory(join(extracted, @"mac")) || !isRealDirectory(source)) throw Refused("The package does not hold a plain mac/" + name + ".component folder.");
+        if (!isRealDirectory(join(extracted, @"mac")) || !isRealDirectory(source)) throw std::runtime_error("The package does not hold a plain mac/" + name + ".component folder.");
         makeDirectory(job.staged().stringByDeletingLastPathComponent);
         require(rename(source.fileSystemRepresentation, job.staged().fileSystemRepresentation) == 0, "Could not prepare the new version.");
         finish(job, installedVersion, abort);

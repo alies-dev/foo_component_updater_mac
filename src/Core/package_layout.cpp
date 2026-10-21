@@ -22,8 +22,6 @@ PackageCheck fail(std::string message) {
     return c;
 }
 
-bool startsWith(std::string_view s, std::string_view prefix) { return s.substr(0, prefix.size()) == prefix; }
-
 bool isUnsafeName(std::string_view name) {
     if (name.find('\0') != std::string_view::npos || name.find('\\') != std::string_view::npos) return true;
     if (name.empty() || name.front() == '/') return true;
@@ -64,12 +62,13 @@ PackageCheck checkPackageLayout(std::string_view zip, std::string const& name) {
     if (static_cast<uint64_t>(dirOffset) + dirSize > eocd) return fail(notZip);
 
     std::string_view const dir = zip.substr(dirOffset, dirSize);
-    std::string const bundle = "mac/" + name + ".component/Contents/";
-    std::string const macosDir = bundle + "MacOS/";
+    std::string const expected = "mac/" + name + ".component";
+    std::string const ownPrefix = expected + "/", infoPlist = ownPrefix + "Contents/Info.plist", macosDir = ownPrefix + "Contents/MacOS/";
     std::string otherBundle;
     bool hasMac = false, hasPlist = false, hasExecutable = false;
     uint64_t total = 0;
     std::vector<std::string> entries;
+    entries.reserve(count);
 
     size_t at = 0;
     for (uint32_t i = 0; i < count; ++i) {
@@ -89,21 +88,20 @@ PackageCheck checkPackageLayout(std::string_view zip, std::string const& name) {
         if (isUnsafeName(entry)) return fail("The package contains an unsafe path: " + printable(entry));
         entries.emplace_back(entry);
 
-        if (startsWith(entry, "mac/")) {
+        if (entry.starts_with("mac/")) {
             hasMac = true;
-            if (!startsWith(entry, "mac/" + name + ".component/") && otherBundle.empty()) {
+            if (!entry.starts_with(ownPrefix) && otherBundle.empty()) {
                 size_t end = entry.find('/', 4);
                 if (end != std::string_view::npos && entry.substr(4, end - 4).ends_with(".component")) otherBundle = std::string(entry.substr(0, end));
             }
         }
-        if (entry == bundle + "Info.plist") hasPlist = true;
-        if (startsWith(entry, macosDir) && entry.size() > macosDir.size() && entry.back() != '/') hasExecutable = true;
+        if (entry == infoPlist) hasPlist = true;
+        if (entry.starts_with(macosDir) && entry.size() > macosDir.size() && entry.back() != '/') hasExecutable = true;
     }
 
     // Entries past the counted ones would still be extracted by ditto, unchecked.
     if (at != dir.size()) return fail(notZip);
 
-    std::string const expected = "mac/" + name + ".component";
     if (!hasMac) return fail("The package has no macOS build (expected " + expected + ").");
     if (!hasPlist && !hasExecutable && !otherBundle.empty()) {
         return fail("The package holds " + otherBundle + " but the installed component is " + expected + ".");
@@ -126,7 +124,7 @@ std::string installBlockReason(bool updateAvailable, std::string const& dllName,
 
     std::string asset = assetName;
     std::transform(asset.begin(), asset.end(), asset.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (!startsWith(downloadUrl, "https://") || !asset.ends_with(".fb2k-component")) return "This source offers no package to install";
+    if (!downloadUrl.starts_with("https://") || !asset.ends_with(".fb2k-component")) return "This source offers no package to install";
     return "";
 }
 
