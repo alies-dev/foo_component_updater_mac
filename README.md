@@ -27,7 +27,7 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 * A results window with the installed and the latest version of each component, its status and a link to the release notes.
 * Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
-* Checks automatically every few days, and whenever you choose foobar2000's own Check For New Versions.
+* Checks automatically every few days.
 * Custom sources for components it does not know, see [docs/custom-sources.md](docs/custom-sources.md).
 * foobar2000's built in components are hidden unless you ask for them.
 

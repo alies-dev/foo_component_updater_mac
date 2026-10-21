@@ -45,11 +45,6 @@ Facts measured while building this component, with foobar2000 2.26 and `SDK-2026
 * The official catalog answers an unknown component with HTTP 200 and the text "No such component.", not a 404. The parser treats both as "not in the catalog".
 * sourceforge.net answers a Cloudflare challenge to unusual clients (`403`); the upstream parser is unchanged and an unreachable feed shows as an Error row.
 
-## Core update menu items
-
-* foobar2000 has no SDK hook for its own update check, so this component cannot run "with" it through a service. It observes `NSMenuDidSendActionNotification` (object nil, main queue) and starts its check when the sent item's `title` is exactly `Check For New Versions` (app menu) or `Check for new foobar2000 versions` (Help menu). Both titles were verified in foobar2000 2.26.
-* Failure mode: if foobar2000 renames either item the trigger stops firing without any error. Our own Help menu command and the Check Now button are not affected. The match is a pure function (`fcu::isCoreUpdateMenuTitle`) with unit tests.
-
 ## Configuration
 
 * On Mac the SDK compiles `cfg_bool`, `cfg_int` and `cfg_string` as `cfg_var_modern`, which reads and writes `fb2k::configStore` (`SDK/cfg_var.cpp`). The values live in `config.sqlite` under `cfg_var.<GUID>` and persist across restarts (verified in the M1 batch). Upstream's cfg code needs no change.
@@ -87,7 +82,7 @@ All files:
 * The result window call is `DeliverCheckResults(checkId, results, message, openIfClosed)`, called for every automatic check. Manual and automatic checks share one delivery path keyed by `CurrentUpdateCheckId()`: the window attached to that check receives the results, a window closed during an automatic check does not get recreated by it, and the notification level only decides whether a closed window opens.
 * The check lambda has a `try` / `catch (std::exception const&)` so nothing escapes into foobar2000.
 * The due test is `fcu::isAutomaticCheckDue` (pure, unit tested) and the check body is `EvaluateAutomaticCheck()`, called on the main thread by the startup delay and by the 6 hour timer in `Integration/PeriodicCheck.mm`. It refuses to start while a check runs (`TryBeginUpdateCheck`) or the results window is open, and writes the last run time when the check starts instead of when it ends.
-* Upstream records the last run only for automatic checks. Here every completed check (manual, Help menu, foobar2000's own "Check For New Versions" trigger, automatic) records it through `MarkCheckCompletedNow()`, and the interval of the automatic check counts from it. The automatic check still also writes it when it starts.
+* Upstream records the last run only for automatic checks. Here every completed check (manual from the Help menu or the window, automatic) records it through `MarkCheckCompletedNow()`, and the interval of the automatic check counts from it. The automatic check still also writes it when it starts.
 * `automatic_check.h` and `.cpp` gain `GetAutomaticCheckLastRun()`, a read only accessor for the persisted last run time (shown on the preferences page).
 * Debug builds only: `on_init` schedules nothing while the autotest config key is set (the saved preference is not touched).
 

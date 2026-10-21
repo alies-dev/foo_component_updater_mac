@@ -11,6 +11,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 * Five more components are known out of the box: `foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS` and `foo_richtext_mac`.
 * GitHub releases are matched by more than the exact `<name>.fb2k-component` file name: `foo_example-macos.fb2k-component`, `foo_example-1.2.0-macos-arm64.fb2k-component` and zips such as `foo_example-v1.2.0.zip` count too.
 
+### Removed
+
+* Choosing foobar2000's Check For New Versions no longer also checks components. Use Help > Check for Component Updates... or the automatic check.
+
 ### Fixed
 
 * `foo_input_ncm` no longer reports its 2021 Windows release as the latest version.
