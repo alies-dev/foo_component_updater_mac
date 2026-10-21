@@ -148,6 +148,10 @@ int main() {
     {
         // End record that claims more entries than the directory holds.
         CHECK(!accepts(buildZip(goodEntries(), 5)), "entry count larger than the directory");
+        // End record that counts fewer entries than the directory holds: the rest would be extracted unchecked.
+        auto hidden = goodEntries();
+        hidden.push_back({"../hidden"});
+        CHECK(!accepts(buildZip(hidden, 2)), "entry hidden behind the counted ones");
         // A directory offset that points outside the file.
         std::string z = buildZip(goodEntries());
         size_t eocd = z.rfind("PK\x05\x06");

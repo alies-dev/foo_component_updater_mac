@@ -98,6 +98,9 @@ PackageCheck checkPackageLayout(std::string_view zip, std::string const& name) {
         if (startsWith(entry, macosDir) && entry.size() > macosDir.size() && entry.back() != '/') hasExecutable = true;
     }
 
+    // Entries past the counted ones would still be extracted by ditto, unchecked.
+    if (at != dir.size()) return fail(notZip);
+
     std::string const expected = "mac/" + name + ".component";
     if (!hasMac) return fail("The package has no macOS build (expected " + expected + ").");
     if (!hasPlist && !hasExecutable && !otherBundle.empty()) {
