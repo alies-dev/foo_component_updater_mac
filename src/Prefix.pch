@@ -1,0 +1,25 @@
+//
+//  Prefix.pch
+//  foo_component_updater_mac
+//
+//  Precompiled header for macOS build
+//
+
+#pragma once
+
+// foobar2000 SDK
+#include <foobar2000/SDK/foobar2000.h>
+
+// Standard library
+#include <string>
+#include <vector>
+#include <memory>
+#include <atomic>
+#include <algorithm>
+#include <cstdint>
+
+// macOS/Cocoa (when included from .mm files)
+#ifdef __OBJC__
+#import <Cocoa/Cocoa.h>
+#import <Foundation/Foundation.h>
+#endif

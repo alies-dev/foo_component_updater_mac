@@ -1,0 +1,7 @@
+.DS_Store
+SDK-*/
+build/
+DerivedData/
+*.xcodeproj/
+*.component
+*.fb2k-component

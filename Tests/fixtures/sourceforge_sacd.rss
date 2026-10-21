@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:files="https://sourceforge.net/api/files.rdf#" xmlns:media="http://video.search.yahoo.com/mrss/" xmlns:doap="http://usefulinc.com/ns/doap#" xmlns:sf="https://sourceforge.net/api/sfelements.rdf#" version="2.0">
+  <channel xmlns:files="https://sourceforge.net/api/files.rdf#" xmlns:media="http://video.search.yahoo.com/mrss/" xmlns:doap="http://usefulinc.com/ns/doap#" xmlns:sf="https://sourceforge.net/api/sfelements.rdf#">
+    <title>Super Audio CD Decoder</title>
+    <link>https://sourceforge.net</link>
+    <description><![CDATA[Files from Super Audio CD Decoder Super Audio CD Decoder input plugin for foobar2000. Decoder is capable of playing back Super Audio CD ISO images, DSDIFF, DSF and DSD WavPack files. DSD(DoP) and PCM output modes. Separate DSD Processor/DSD Converter plugins for track extraction into DSD/DST encoded files.]]></description>
+    <pubDate>Wed, 21 Oct 2026 01:15:24 UT</pubDate>
+    <managingEditor>noreply@sourceforge.net (SourceForge.net)</managingEditor>
+    <docs>http://blogs.law.harvard.edu/tech/rss</docs>
+    <item>
+      <title><![CDATA[/foo_input_sacd/foo_input_sacd-2.0.25_for_foobar-1.6.x.zip]]></title>
+      <link>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.25_for_foobar-1.6.x.zip/download</link>
+      <guid>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.25_for_foobar-1.6.x.zip/download</guid>
+      <pubDate>Wed, 24 Jun 2026 16:30:21 UT</pubDate>
+      <description><![CDATA[/foo_input_sacd/foo_input_sacd-2.0.25_for_foobar-1.6.x.zip]]></description>
+      <files:sf-file-id xmlns:files="https://sourceforge.net/api/files.rdf#">64594858</files:sf-file-id>
+      <files:extra-info xmlns:files="https://sourceforge.net/api/files.rdf#">Zip archive data</files:extra-info>
+      <media:content xmlns:media="http://video.search.yahoo.com/mrss/" type="application/zip; charset=binary" url="https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.25_for_foobar-1.6.x.zip/download" filesize="10766178"><media:hash algo="md5">1bb879cc8e2b536c3acd06259f680c76</media:hash></media:content>
+    </item>
+    <item>
+      <title><![CDATA[/foo_input_sacd/foo_input_sacd-2.0.25.zip]]></title>
+      <link>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.25.zip/download</link>
+      <guid>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.25.zip/download</guid>
+      <pubDate>Mon, 22 Jun 2026 19:18:56 UT</pubDate>
+      <description><![CDATA[/foo_input_sacd/foo_input_sacd-2.0.25.zip]]></description>
+      <files:sf-file-id xmlns:files="https://sourceforge.net/api/files.rdf#">64546665</files:sf-file-id>
+      <files:extra-info xmlns:files="https://sourceforge.net/api/files.rdf#">Zip archive data</files:extra-info>
+      <media:content xmlns:media="http://video.search.yahoo.com/mrss/" type="application/zip; charset=binary" url="https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.25.zip/download" filesize="10798469"><media:hash algo="md5">278bf9447c2ac5dd3e3f58edc01f27c1</media:hash></media:content>
+    </item>
+    <item>
+      <title><![CDATA[/foo_input_sacd/readme.txt]]></title>
+      <link>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/readme.txt/download</link>
+      <guid>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/readme.txt/download</guid>
+      <pubDate>Mon, 22 Jun 2026 19:18:54 UT</pubDate>
+      <description><![CDATA[/foo_input_sacd/readme.txt]]></description>
+      <files:sf-file-id xmlns:files="https://sourceforge.net/api/files.rdf#">64546664</files:sf-file-id>
+      <files:extra-info xmlns:files="https://sourceforge.net/api/files.rdf#">text</files:extra-info>
+      <media:content xmlns:media="http://video.search.yahoo.com/mrss/" type="text/plain; charset=us-ascii" url="https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/readme.txt/download" filesize="17031"><media:hash algo="md5">64408b2721cc51214f57ad1bc9acc500</media:hash></media:content>
+    </item>
+    <item>
+      <title><![CDATA[/foo_input_sacd/foo_input_sacd-2.0.24.zip]]></title>
+      <link>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.24.zip/download</link>
+      <guid>https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.24.zip/download</guid>
+      <pubDate>Fri, 15 May 2026 13:29:42 UT</pubDate>
+      <description><![CDATA[/foo_input_sacd/foo_input_sacd-2.0.24.zip]]></description>
+      <files:sf-file-id xmlns:files="https://sourceforge.net/api/files.rdf#">63609659</files:sf-file-id>
+      <files:extra-info xmlns:files="https://sourceforge.net/api/files.rdf#">Zip archive data</files:extra-info>
+      <media:content xmlns:media="http://video.search.yahoo.com/mrss/" type="application/zip; charset=binary" url="https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/foo_input_sacd-2.0.24.zip/download" filesize="9404837"><media:hash algo="md5">a31746e8c3a0c0a3ea5efa8cd98ea218</media:hash></media:content>
+    </item>
+  </channel>
+</rss>

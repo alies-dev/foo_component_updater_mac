@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.alies.foo-component-updater-mac</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Component Updater</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>FB2KUpdateSource</key>
+	<dict>
+		<key>source</key>
+		<string>github</string>
+		<key>owner</key>
+		<string>alies-dev</string>
+		<key>repo</key>
+		<string>foo_component_updater_mac</string>
+	</dict>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright (c) 2026 alies-dev. Ported code Copyright (c) 2026 p2ashiura.</string>
+	<key>NSPrincipalClass</key>
+	<string></string>
+</dict>
+</plist>

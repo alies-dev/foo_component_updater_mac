@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "components": [
+    { "dll": "foo_jl_album_art", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_biography", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_effects_dsp", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_plorg", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_queue_manager", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_scrobble", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_simplaylist", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_spectrum", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_tidal", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_vectorscope", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_jl_wave_seekbar", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" }
+  ]
+}

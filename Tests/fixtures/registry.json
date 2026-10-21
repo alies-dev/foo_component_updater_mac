@@ -1,0 +1,1649 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "dll": "foo_24sevenfm_covers",
+      "source": "github",
+      "owner": "pke",
+      "repo": "24sevenfm_covers"
+    },
+    {
+      "dll": "foo_ai",
+      "source": "github",
+      "owner": "Bobini1",
+      "repo": "foo_ai"
+    },
+    {
+      "dll": "foo_albumart_grid",
+      "source": "github",
+      "owner": "veselyvaclavcz",
+      "repo": "foobar-grid-view"
+    },
+    {
+      "dll": "foo_albumtrain",
+      "source": "github",
+      "owner": "p2ashiura",
+      "repo": "Album-Train"
+    },
+    {
+      "dll": "foo_alphabar",
+      "source": "github",
+      "owner": "MBach",
+      "repo": "foo_alphabar"
+    },
+    {
+      "dll": "foo_api_wizard",
+      "source": "github",
+      "owner": "The-Wizardium",
+      "repo": "API-Wizard"
+    },
+    {
+      "dll": "foo_artgrab",
+      "source": "github",
+      "owner": "jame25",
+      "repo": "foo_artgrab"
+    },
+    {
+      "dll": "foo_artist_view",
+      "source": "github",
+      "owner": "veselyvaclavcz",
+      "repo": "foo_artist_view"
+    },
+    {
+      "dll": "foo_artwork",
+      "source": "github",
+      "owner": "jame25",
+      "repo": "foo_artwork"
+    },
+    {
+      "dll": "foo_atelier_queuebridge",
+      "source": "github",
+      "owner": "Wffv9FNa",
+      "repo": "foo_atelier_queuebridge"
+    },
+    {
+      "dll": "foo_audio_wizard",
+      "source": "github",
+      "owner": "The-Wizardium",
+      "repo": "Audio-Wizard"
+    },
+    {
+      "dll": "foo_audiolens",
+      "source": "github",
+      "owner": "Oxensepp",
+      "repo": "audiolens-seekbar"
+    },
+    {
+      "dll": "foo_audiomd5",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_audiomd5"
+    },
+    {
+      "dll": "foo_autoenqueue",
+      "source": "github",
+      "owner": "pienkowb",
+      "repo": "foo_autoenqueue"
+    },
+    {
+      "dll": "foo_autoplay",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/fooautoplay/files/fooautoplay/"
+    },
+    {
+      "dll": "foo_azuracast_now_playing",
+      "source": "github",
+      "owner": "smoralis",
+      "repo": "foo_azuracast_now_playing"
+    },
+    {
+      "dll": "foo_bbookmark",
+      "source": "github",
+      "owner": "Paremo",
+      "repo": "foo_bbookmark"
+    },
+    {
+      "dll": "foo_beefweb",
+      "source": "github",
+      "owner": "hyperblast",
+      "repo": "beefweb"
+    },
+    {
+      "dll": "foo_bestversion",
+      "source": "github",
+      "owner": "hymerman",
+      "repo": "foo_bestversion"
+    },
+    {
+      "dll": "foo_bookbar",
+      "source": "github",
+      "owner": "michaldziwisz",
+      "repo": "bookbar"
+    },
+    {
+      "dll": "foo_bpm",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_bpm"
+    },
+    {
+      "dll": "foo_bpm",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_bpm"
+    },
+    {
+      "dll": "foo_bpmkey",
+      "source": "github",
+      "owner": "VadimLevo",
+      "repo": "foo_bpmkey"
+    },
+    {
+      "dll": "foo_bs2b",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/bs2b/files/plugins/Foobar2000%20plugin/"
+    },
+    {
+      "dll": "foo_cad_nowplaying",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_cad_nowplaying"
+    },
+    {
+      "dll": "foo_cad_plus",
+      "source": "github",
+      "owner": "RangerCD",
+      "repo": "foo-cad-plus"
+    },
+    {
+      "dll": "foo_catnap",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_catnap"
+    },
+    {
+      "dll": "foo_chronflow",
+      "source": "github",
+      "owner": "Chronial",
+      "repo": "foo_chronflow"
+    },
+    {
+      "dll": "foo_cnn_bpm",
+      "source": "github",
+      "owner": "NotSimone",
+      "repo": "foo_cnn_bpm"
+    },
+    {
+      "dll": "foo_component_update_checker",
+      "source": "github",
+      "owner": "p2ashiura",
+      "repo": "foo_component_update_checker"
+    },
+    {
+      "dll": "foo_controlserver",
+      "source": "github",
+      "owner": "audiohead",
+      "repo": "foo_controlserver"
+    },
+    {
+      "dll": "foo_cover_utils",
+      "source": "marc2k3",
+      "url": "https://marc2k3.github.io/component/cover-utils/"
+    },
+    {
+      "dll": "foo_coverflow",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_coverflow"
+    },
+    {
+      "dll": "foo_cue_charset",
+      "source": "github",
+      "owner": "kidoz",
+      "repo": "foo-cue-charset"
+    },
+    {
+      "dll": "foo_cuefixer",
+      "source": "github",
+      "owner": "RevenantX",
+      "repo": "foo_cuefixer"
+    },
+    {
+      "dll": "foo_cuesheet_creator",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_cuesheet_creator"
+    },
+    {
+      "dll": "foo_deemph",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_deemph"
+    },
+    {
+      "dll": "foo_devconsole",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_devconsole"
+    },
+    {
+      "dll": "foo_discogger",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_discogger"
+    },
+    {
+      "dll": "foo_discord_presence",
+      "source": "github",
+      "owner": "winkyfaceak",
+      "repo": "foobar2000-discord-presence"
+    },
+    {
+      "dll": "foo_discord_rich",
+      "source": "github",
+      "owner": "s0hv",
+      "repo": "foo_discord_rich"
+    },
+    {
+      "dll": "foo_discord_rich",
+      "source": "github",
+      "owner": "shirafukayayoi",
+      "repo": "foo_discord_rich"
+    },
+    {
+      "dll": "foo_discord_rich",
+      "source": "github",
+      "owner": "supern64",
+      "repo": "foo_discord_rich"
+    },
+    {
+      "dll": "foo_discord_rich",
+      "source": "github",
+      "owner": "TheQwertiest",
+      "repo": "foo_discord_rich"
+    },
+    {
+      "dll": "foo_discord_rich",
+      "source": "github",
+      "owner": "wsnrq",
+      "repo": "foo_discord_rich"
+    },
+    {
+      "dll": "foo_dop",
+      "source": "github",
+      "owner": "reupen",
+      "repo": "ipod_manager"
+    },
+    {
+      "dll": "foo_dotnet_component_host",
+      "source": "github",
+      "owner": "TheQwertiest",
+      "repo": "foo_dotnet_component_host"
+    },
+    {
+      "dll": "foo_downloader",
+      "source": "github",
+      "owner": "Duoslow",
+      "repo": "foo_music_downloader"
+    },
+    {
+      "dll": "foo_dr_meter",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dr_meter"
+    },
+    {
+      "dll": "foo_drpc",
+      "source": "github",
+      "owner": "ultrasn0w",
+      "repo": "foo_drpc"
+    },
+    {
+      "dll": "foo_dsd_asio",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/sacddecoder/files/foo_dsd_asio/"
+    },
+    {
+      "dll": "foo_dsd_converter",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/sacddecoder/files/foo_dsd_converter/"
+    },
+    {
+      "dll": "foo_dsd_processor",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/sacddecoder/files/foo_dsd_processor/"
+    },
+    {
+      "dll": "foo_dsp_alauda",
+      "source": "github",
+      "owner": "moenium-AI",
+      "repo": "Alauda"
+    },
+    {
+      "dll": "foo_dsp_amp",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_amp"
+    },
+    {
+      "dll": "foo_dsp_art_resampler",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_art_resampler"
+    },
+    {
+      "dll": "foo_dsp_clap",
+      "source": "github",
+      "owner": "kartun83",
+      "repo": "foo_dsp_clap"
+    },
+    {
+      "dll": "foo_dsp_convolver",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_convolver"
+    },
+    {
+      "dll": "foo_dsp_crossmix",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_crossmix"
+    },
+    {
+      "dll": "foo_dsp_deemph",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_deemph"
+    },
+    {
+      "dll": "foo_dsp_delta",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_delta"
+    },
+    {
+      "dll": "foo_dsp_dither",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_dither"
+    },
+    {
+      "dll": "foo_dsp_downmixer",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_downmixer"
+    },
+    {
+      "dll": "foo_dsp_dtsenc",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_dtsenc"
+    },
+    {
+      "dll": "foo_dsp_fadeinout",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_fadeinout"
+    },
+    {
+      "dll": "foo_dsp_fadeout_on_command",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_fadeout_on_command"
+    },
+    {
+      "dll": "foo_dsp_fakegapless",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_fakegapless"
+    },
+    {
+      "dll": "foo_dsp_fsurround",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_fsurround"
+    },
+    {
+      "dll": "foo_dsp_hardclip",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_hardclip"
+    },
+    {
+      "dll": "foo_dsp_health",
+      "source": "github",
+      "owner": "jame25",
+      "repo": "foo_dsp_health"
+    },
+    {
+      "dll": "foo_dsp_lcc",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_lcc"
+    },
+    {
+      "dll": "foo_dsp_lowpass",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_lowpass"
+    },
+    {
+      "dll": "foo_dsp_mdadither",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_mdadither"
+    },
+    {
+      "dll": "foo_dsp_neutralizer",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/dvdadecoder/files/foo_dsp_neutralizer/"
+    },
+    {
+      "dll": "foo_dsp_nogaps",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_nogaps"
+    },
+    {
+      "dll": "foo_dsp_normalizer",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_normalizer"
+    },
+    {
+      "dll": "foo_dsp_openal",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/foobar-openal/files/foo_dsp_openal/"
+    },
+    {
+      "dll": "foo_dsp_pregap",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_pregap"
+    },
+    {
+      "dll": "foo_dsp_r8brain_resampler",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_r8brain_resampler"
+    },
+    {
+      "dll": "foo_dsp_replaygain",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_replaygain"
+    },
+    {
+      "dll": "foo_dsp_resampler",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_resampler"
+    },
+    {
+      "dll": "foo_dsp_skip_silence",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_skip_silence"
+    },
+    {
+      "dll": "foo_dsp_sox_resampler",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_sox_resampler"
+    },
+    {
+      "dll": "foo_dsp_speaker_range",
+      "source": "github",
+      "owner": "kidoz",
+      "repo": "foo-dsp-speaker-range"
+    },
+    {
+      "dll": "foo_dsp_speex_resampler",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_speex_resampler"
+    },
+    {
+      "dll": "foo_dsp_src_resampler",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_src_resampler"
+    },
+    {
+      "dll": "foo_dsp_stereoconv",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_dsp_stereoconv"
+    },
+    {
+      "dll": "foo_dsp_tube_simulator",
+      "source": "github",
+      "owner": "moenium-AI",
+      "repo": "tube-simulator"
+    },
+    {
+      "dll": "foo_dsp_width",
+      "source": "github",
+      "owner": "h1data",
+      "repo": "foo_dsp_width"
+    },
+    {
+      "dll": "foo_duration_subsong_manager",
+      "source": "github",
+      "owner": "M3MEMonster",
+      "repo": "Duration_and_Subsong_Manager"
+    },
+    {
+      "dll": "foo_enhanced_playcount",
+      "source": "github",
+      "owner": "kbuffington",
+      "repo": "foo_enhanced_playcount"
+    },
+    {
+      "dll": "foo_external_tags",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_external_tags"
+    },
+    {
+      "dll": "foo_favorite",
+      "source": "github",
+      "owner": "shirafukayayoi",
+      "repo": "foo_favorite"
+    },
+    {
+      "dll": "foo_filename_editor",
+      "source": "github",
+      "owner": "VadimLevo",
+      "repo": "foo_filename_editor"
+    },
+    {
+      "dll": "foo_fix",
+      "source": "github",
+      "owner": "ttsping",
+      "repo": "foo_fix"
+    },
+    {
+      "dll": "foo_flex_dsp",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_flex_dsp"
+    },
+    {
+      "dll": "foo_flowin",
+      "source": "github",
+      "owner": "ttsping",
+      "repo": "foo_flowin"
+    },
+    {
+      "dll": "foo_fomalhaut",
+      "source": "github",
+      "owner": "Oxensepp",
+      "repo": "fomalhaut"
+    },
+    {
+      "dll": "foo_gamesenseoled",
+      "source": "github",
+      "owner": "weespin",
+      "repo": "foo_gamesenseoled"
+    },
+    {
+      "dll": "foo_gdrive_stream",
+      "source": "github",
+      "owner": "shirafukayayoi",
+      "repo": "foo_gdrive_stream"
+    },
+    {
+      "dll": "foo_hackrf",
+      "source": "github",
+      "owner": "jocover",
+      "repo": "foo_hackrf"
+    },
+    {
+      "dll": "foo_hdcd",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_hdcd"
+    },
+    {
+      "dll": "foo_httpcontrol",
+      "source": "codeberg",
+      "owner": "oblikoamorale",
+      "repo": "foo_httpcontrol"
+    },
+    {
+      "dll": "foo_httpcontrol",
+      "source": "github",
+      "owner": "regorxxx",
+      "repo": "foo_httpcontrol_fb2kc"
+    },
+    {
+      "dll": "foo_httpserver_ctrl",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/foohttpserver/files/foohttpserver/"
+    },
+    {
+      "dll": "foo_input_adplug_mac",
+      "source": "github",
+      "owner": "nrlquaker",
+      "repo": "foo_input_adplug_mac"
+    },
+    {
+      "dll": "foo_input_amr",
+      "source": "github",
+      "owner": "unjello",
+      "repo": "foo_input_amr"
+    },
+    {
+      "dll": "foo_input_apt-x100",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/dvdadecoder/files/foo_input_apt-x100/"
+    },
+    {
+      "dll": "foo_input_asciimusiccom",
+      "source": "github",
+      "owner": "mk-822",
+      "repo": "foo_input_asciimusiccom"
+    },
+    {
+      "dll": "foo_input_dtshd",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/dvdadecoder/files/foo_input_dtshd/"
+    },
+    {
+      "dll": "foo_input_dvda",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/dvdadecoder/files/foo_input_dvda/"
+    },
+    {
+      "dll": "foo_input_halac",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_input_halac"
+    },
+    {
+      "dll": "foo_input_hqlc",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_input_hqlc"
+    },
+    {
+      "dll": "foo_input_ncm",
+      "source": "github",
+      "owner": "pnck",
+      "repo": "foo_input_ncm"
+    },
+    {
+      "dll": "foo_input_nemuc",
+      "source": "github",
+      "owner": "hozuki",
+      "repo": "foo_input_nemuc"
+    },
+    {
+      "dll": "foo_input_pmd",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_input_pmd"
+    },
+    {
+      "dll": "foo_input_qoa",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_input_qoa"
+    },
+    {
+      "dll": "foo_input_sacd",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/sacddecoder/files/foo_input_sacd/"
+    },
+    {
+      "dll": "foo_input_signal",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_input_signal"
+    },
+    {
+      "dll": "foo_input_spotify",
+      "source": "github",
+      "owner": "FauxFaux",
+      "repo": "foo_input_spotify"
+    },
+    {
+      "dll": "foo_input_tak",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_input_tak"
+    },
+    {
+      "dll": "foo_input_udsd",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/sacddecoder/files/macOS%20%2BWindows/foo_input_udsd/"
+    },
+    {
+      "dll": "foo_input_v2m_alpha",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_input_v2m_alpha"
+    },
+    {
+      "dll": "foo_input_vgmstream",
+      "source": "github",
+      "owner": "vgmstream",
+      "repo": "vgmstream"
+    },
+    {
+      "dll": "foo_input_wave_loop",
+      "source": "github",
+      "owner": "suwasakix",
+      "repo": "foo_input_wave_loop"
+    },
+    {
+      "dll": "foo_jscript_panel",
+      "source": "github",
+      "owner": "kbuffington",
+      "repo": "foo_jscript_panel"
+    },
+    {
+      "dll": "foo_jscript_panel",
+      "source": "github",
+      "owner": "leefan",
+      "repo": "foo-jscript-panel"
+    },
+    {
+      "dll": "foo_lastfm_playcount_sync",
+      "source": "marc2k3",
+      "url": "https://marc2k3.github.io/component/lastfm-playcount-sync/"
+    },
+    {
+      "dll": "foo_lddc",
+      "source": "github",
+      "owner": "chenmozhijin",
+      "repo": "foo_lddc"
+    },
+    {
+      "dll": "foo_lirc",
+      "source": "github",
+      "owner": "izanuda",
+      "repo": "foo_lirc"
+    },
+    {
+      "dll": "foo_lirc",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/foolirc/files/foo_lirc/"
+    },
+    {
+      "dll": "foo_listenbrainz2",
+      "source": "github",
+      "owner": "phw",
+      "repo": "foo_listenbrainz2"
+    },
+    {
+      "dll": "foo_lnk",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_lnk"
+    },
+    {
+      "dll": "foo_lnk",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_lnk"
+    },
+    {
+      "dll": "foo_lock",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_lock"
+    },
+    {
+      "dll": "foo_logitech_lcd",
+      "source": "github",
+      "owner": "ectotropic",
+      "repo": "foo_logitech_lcd"
+    },
+    {
+      "dll": "foo_loop",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_loop"
+    },
+    {
+      "dll": "foo_loop_play_with_tags",
+      "source": "github",
+      "owner": "litproca",
+      "repo": "foo_loop_play_with_tags"
+    },
+    {
+      "dll": "foo_loop-sync",
+      "source": "github",
+      "owner": "otoboku",
+      "repo": "foo_loop-sync"
+    },
+    {
+      "dll": "foo_lyrics_ai_translator",
+      "source": "github",
+      "owner": "Evgeniy-51",
+      "repo": "LyricsAITranslator"
+    },
+    {
+      "dll": "foo_m3ucue_saver",
+      "source": "github",
+      "owner": "VadimLevo",
+      "repo": "foo_m3ucue_saver"
+    },
+    {
+      "dll": "foo_maloja",
+      "source": "github",
+      "owner": "ICTman1076",
+      "repo": "foo_maloja"
+    },
+    {
+      "dll": "foo_matrix_nowplaying",
+      "source": "github",
+      "owner": "jame25",
+      "repo": "foo_matrix_nowplaying"
+    },
+    {
+      "dll": "foo_mediacontrol",
+      "source": "github",
+      "owner": "dumbie",
+      "repo": "foo_mediacontrol"
+    },
+    {
+      "dll": "foo_mediacontrol",
+      "source": "github",
+      "owner": "Hual",
+      "repo": "foo_mediacontrol"
+    },
+    {
+      "dll": "foo_mediacontrol",
+      "source": "github",
+      "owner": "ungive",
+      "repo": "foo_mediacontrol"
+    },
+    {
+      "dll": "foo_metrono",
+      "source": "github",
+      "owner": "VadimLevo",
+      "repo": "foo_metrono"
+    },
+    {
+      "dll": "foo_metronome",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_metronome"
+    },
+    {
+      "dll": "foo_midi",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_midi"
+    },
+    {
+      "dll": "foo_mixcloud",
+      "source": "github",
+      "owner": "zetmar-collab",
+      "repo": "foo_mixcloud"
+    },
+    {
+      "dll": "foo_mlsync",
+      "source": "github",
+      "owner": "ajitnilakantan",
+      "repo": "foo_mlsync"
+    },
+    {
+      "dll": "foo_monthly_stats",
+      "source": "github",
+      "owner": "shirafukayayoi",
+      "repo": "foo_monthly_stats"
+    },
+    {
+      "dll": "foo_mpris",
+      "source": "github",
+      "owner": "wsnrq",
+      "repo": "foobard"
+    },
+    {
+      "dll": "foo_mpv",
+      "source": "github",
+      "owner": "sammoth",
+      "repo": "foo_mpv"
+    },
+    {
+      "dll": "foo_music_downloader",
+      "source": "github",
+      "owner": "Duoslow",
+      "repo": "foo_music_downloader"
+    },
+    {
+      "dll": "foo_musical_key",
+      "source": "github",
+      "owner": "PEERSOFTdev",
+      "repo": "foo_musical_key"
+    },
+    {
+      "dll": "foo_musicbrainz",
+      "source": "github",
+      "owner": "kbuffington",
+      "repo": "foo_musicbrainz"
+    },
+    {
+      "dll": "foo_musicbrainz64",
+      "source": "marc2k3",
+      "url": "https://marc2k3.github.io/component/musicbrainz64/"
+    },
+    {
+      "dll": "foo_nds",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_nds"
+    },
+    {
+      "dll": "foo_nobreak",
+      "source": "github",
+      "owner": "VadimLevo",
+      "repo": "foo_nobreak"
+    },
+    {
+      "dll": "foo_nosleep",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_nosleep"
+    },
+    {
+      "dll": "foo_nosleep_modern",
+      "source": "github",
+      "owner": "LuckyTil",
+      "repo": "foo_nosleep_modern"
+    },
+    {
+      "dll": "foo_now_playing_helper",
+      "source": "github",
+      "owner": "DeadSix27",
+      "repo": "foo_now_playing_helper"
+    },
+    {
+      "dll": "foo_nowbar",
+      "source": "github",
+      "owner": "jame25",
+      "repo": "foo_nowbar"
+    },
+    {
+      "dll": "foo_nowplaying_copy",
+      "source": "github",
+      "owner": "Maximum0303",
+      "repo": "foo_nowplaying_copy"
+    },
+    {
+      "dll": "foo_nowplaying2",
+      "source": "github",
+      "owner": "foxx1337",
+      "repo": "foo_nowplaying2"
+    },
+    {
+      "dll": "foo_nsync",
+      "source": "github",
+      "owner": "jame25",
+      "repo": "foo_nsync"
+    },
+    {
+      "dll": "foo_openhacks",
+      "source": "github",
+      "owner": "ttsping",
+      "repo": "foo_openhacks"
+    },
+    {
+      "dll": "foo_openhacks_mod",
+      "source": "github",
+      "owner": "simear2004",
+      "repo": "foo_openhacks_mod"
+    },
+    {
+      "dll": "foo_openlyrics",
+      "source": "github",
+      "owner": "jacquesh",
+      "repo": "foo_openlyrics"
+    },
+    {
+      "dll": "foo_opensubsonic",
+      "source": "github",
+      "owner": "michioxd",
+      "repo": "foo_opensubsonic"
+    },
+    {
+      "dll": "foo_opusenc",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_opusenc"
+    },
+    {
+      "dll": "foo_osd",
+      "source": "github",
+      "owner": "HongYue1",
+      "repo": "foo_osd"
+    },
+    {
+      "dll": "foo_out_asio+dsd",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/sacddecoder/files/foo_out_asio%2Bdsd/"
+    },
+    {
+      "dll": "foo_out_asio2",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/foobar2000-wasap2-output/files/"
+    },
+    {
+      "dll": "foo_out_avfoundation",
+      "source": "github",
+      "owner": "pnck",
+      "repo": "foo_out_avfoundation"
+    },
+    {
+      "dll": "foo_out_digital",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_out_digital"
+    },
+    {
+      "dll": "foo_out_pulse",
+      "source": "github",
+      "owner": "sammoth",
+      "repo": "foo_out_pulse"
+    },
+    {
+      "dll": "foo_out_scream",
+      "source": "github",
+      "owner": "sammoth",
+      "repo": "foo_out_scream"
+    },
+    {
+      "dll": "foo_out_spatial",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_out_spatial"
+    },
+    {
+      "dll": "foo_out_wam",
+      "source": "github",
+      "owner": "trvny",
+      "repo": "wambridge"
+    },
+    {
+      "dll": "foo_out_wasap2-asio2",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/foobar2000-wasap2-output/files/"
+    },
+    {
+      "dll": "foo_out_wasapi_x64",
+      "source": "github",
+      "owner": "unknowbug",
+      "repo": "foo_out_wasapi_x64"
+    },
+    {
+      "dll": "foo_outinfo",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_outinfo"
+    },
+    {
+      "dll": "foo_partyshuffle",
+      "source": "github",
+      "owner": "phts",
+      "repo": "foo_partyshuffle"
+    },
+    {
+      "dll": "foo_pd_aac",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_pd_aac"
+    },
+    {
+      "dll": "foo_play_next",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_play_next"
+    },
+    {
+      "dll": "foo_playcount_2003",
+      "source": "marc2k3",
+      "url": "https://marc2k3.github.io/component/playcount-2003/"
+    },
+    {
+      "dll": "foo_playlist_fix",
+      "source": "marc2k3",
+      "url": "https://marc2k3.github.io/component/playlist-fix/"
+    },
+    {
+      "dll": "foo_playlist_info",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_playlist_info"
+    },
+    {
+      "dll": "foo_playlistclear",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_playlistclear"
+    },
+    {
+      "dll": "foo_pls_writer",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_pls_writer"
+    },
+    {
+      "dll": "foo_podcast",
+      "source": "github",
+      "owner": "zetmar-collab",
+      "repo": "foo_podcast"
+    },
+    {
+      "dll": "foo_popupplus",
+      "source": "sourceforge",
+      "url": "https://sourceforge.net/projects/foopopupplus/files/foopopupplus/"
+    },
+    {
+      "dll": "foo_preview",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_preview"
+    },
+    {
+      "dll": "foo_previewer",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_previewer"
+    },
+    {
+      "dll": "foo_previous",
+      "source": "github",
+      "owner": "terachot",
+      "repo": "Playback_History_-foo_previous-"
+    },
+    {
+      "dll": "foo_qat",
+      "source": "github",
+      "owner": "michaldziwisz",
+      "repo": "qat-foobar"
+    },
+    {
+      "dll": "foo_qobuz",
+      "source": "github",
+      "owner": "icedream",
+      "repo": "fb2k-qobuz"
+    },
+    {
+      "dll": "foo_queue_editor",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_queue_editor"
+    },
+    {
+      "dll": "foo_queue_viewer",
+      "source": "marc2k3",
+      "url": "https://marc2k3.github.io/component/queue-viewer/"
+    },
+    {
+      "dll": "foo_queuecontents",
+      "source": "github",
+      "owner": "ssalonen",
+      "repo": "foo_queuecontents"
+    },
+    {
+      "dll": "foo_quicksearch",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_quicksearch"
+    },
+    {
+      "dll": "foo_r128_normalizer",
+      "source": "github",
+      "owner": "Maximum0303",
+      "repo": "foo_r128_normalizer"
+    },
+    {
+      "dll": "foo_r128meter",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_r128meter"
+    },
+    {
+      "dll": "foo_rds_autopause",
+      "source": "github",
+      "owner": "itsuart",
+      "repo": "foo_rds_autopause"
+    },
+    {
+      "dll": "foo_record",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_record"
+    },
+    {
+      "dll": "foo_rehearsal",
+      "source": "github",
+      "owner": "ptytb",
+      "repo": "foo_rehearsal"
+    },
+    {
+      "dll": "foo_renamer",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_renamer"
+    },
+    {
+      "dll": "foo_reset_stop_after_current",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_reset_stop_after_current"
+    },
+    {
+      "dll": "foo_resume",
+      "source": "github",
+      "owner": "reda777",
+      "repo": "foo_resume"
+    },
+    {
+      "dll": "foo_retain_playtime",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_retain_playtime"
+    },
+    {
+      "dll": "foo_rg_bump",
+      "source": "github",
+      "owner": "Nightblade",
+      "repo": "foo_rg_bump"
+    },
+    {
+      "dll": "foo_rip_offset",
+      "source": "github",
+      "owner": "VadimLevo",
+      "repo": "foo_rip_offset"
+    },
+    {
+      "dll": "foo_run_xgrp",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_run_xgrp"
+    },
+    {
+      "dll": "foo_sc68",
+      "source": "github",
+      "owner": "M3MEMonster",
+      "repo": "foo_sc68"
+    },
+    {
+      "dll": "foo_scheduler_mod",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_scheduler_mod"
+    },
+    {
+      "dll": "foo_scrobble",
+      "source": "github",
+      "owner": "gix",
+      "repo": "foo_scrobble"
+    },
+    {
+      "dll": "foo_scrobbler_mac",
+      "source": "github",
+      "owner": "zfoxer",
+      "repo": "foo_scrobbler_mac"
+    },
+    {
+      "dll": "foo_scrobbler_win",
+      "source": "github",
+      "owner": "zfoxer",
+      "repo": "foo_scrobbler_win"
+    },
+    {
+      "dll": "foo_scrobbler_yin",
+      "source": "github",
+      "owner": "zfoxer",
+      "repo": "foo_scrobbler_yin"
+    },
+    {
+      "dll": "foo_seek_to_time",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_seek_to_time"
+    },
+    {
+      "dll": "foo_session",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_session"
+    },
+    {
+      "dll": "foo_shutdown",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_shutdown"
+    },
+    {
+      "dll": "foo_sid",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_sid"
+    },
+    {
+      "dll": "foo_skip",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_skip"
+    },
+    {
+      "dll": "foo_skipcount",
+      "source": "github",
+      "owner": "Fjara-h",
+      "repo": "foo_skipcount"
+    },
+    {
+      "dll": "foo_sonic_refiner",
+      "source": "github",
+      "owner": "Maximum0303",
+      "repo": "foo_sonic_refiner"
+    },
+    {
+      "dll": "foo_soundcloud",
+      "source": "github",
+      "owner": "zetmar-collab",
+      "repo": "foo_soundcloud"
+    },
+    {
+      "dll": "foo_spectrum_seekbar",
+      "source": "github",
+      "owner": "veselyvaclavcz",
+      "repo": "foobar-spectrum-seekbar"
+    },
+    {
+      "dll": "foo_spider_monkey_panel",
+      "source": "github",
+      "owner": "dima-lur",
+      "repo": "spider-monkey-panel-x64"
+    },
+    {
+      "dll": "foo_spider_monkey_panel",
+      "source": "github",
+      "owner": "theqwertiest",
+      "repo": "foo_spider_monkey_panel"
+    },
+    {
+      "dll": "foo_spotify",
+      "source": "github",
+      "owner": "TheQwertiest",
+      "repo": "foo_spotify"
+    },
+    {
+      "dll": "foo_startpaused",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_startpaused"
+    },
+    {
+      "dll": "foo_statistics",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_statistics"
+    },
+    {
+      "dll": "foo_statistics",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_statistics"
+    },
+    {
+      "dll": "foo_stop_after_focused",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_stop_after_focused"
+    },
+    {
+      "dll": "foo_stop_after_queue",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_stop_after_queue"
+    },
+    {
+      "dll": "foo_stop_after_track",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_stop_after_track"
+    },
+    {
+      "dll": "foo_stop_on_current",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_stop_on_current"
+    },
+    {
+      "dll": "foo_stop_on_error",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_stop_on_error"
+    },
+    {
+      "dll": "foo_stopafteralbum",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_stopafteralbum"
+    },
+    {
+      "dll": "foo_strip",
+      "source": "github",
+      "owner": "masterrite",
+      "repo": "Foo_strip"
+    },
+    {
+      "dll": "foo_strm",
+      "source": "github",
+      "owner": "Messere",
+      "repo": "foo_strm"
+    },
+    {
+      "dll": "foo_subsonic",
+      "source": "github",
+      "owner": "hypfvieh",
+      "repo": "foo_subsonic"
+    },
+    {
+      "dll": "foo_svg_services",
+      "source": "github",
+      "owner": "reupen",
+      "repo": "svg-services"
+    },
+    {
+      "dll": "foo_tag_normalizer",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_tag_normalizer"
+    },
+    {
+      "dll": "foo_taskbar_playback_progress_bar",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_taskbar_playback_progress_bar"
+    },
+    {
+      "dll": "foo_tfsandbox",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_tfsandbox"
+    },
+    {
+      "dll": "foo_tfsandbox_mod",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_tfsandbox_mod"
+    },
+    {
+      "dll": "foo_thbgm",
+      "source": "github",
+      "owner": "nyfair",
+      "repo": "foo_thbgm"
+    },
+    {
+      "dll": "foo_timebomb2",
+      "source": "github",
+      "owner": "grimes2",
+      "repo": "foo_timebomb2"
+    },
+    {
+      "dll": "foo_timesleep",
+      "source": "github",
+      "owner": "shirafukayayoi",
+      "repo": "foo_timesleep"
+    },
+    {
+      "dll": "foo_title",
+      "source": "github",
+      "owner": "TheQwertiest",
+      "repo": "dotnet_title_bar"
+    },
+    {
+      "dll": "foo_trackpos",
+      "source": "github",
+      "owner": "Chronial",
+      "repo": "foo_trackpos"
+    },
+    {
+      "dll": "foo_trackpos_mod",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_trackpos_mod"
+    },
+    {
+      "dll": "foo_traycontrols",
+      "source": "github",
+      "owner": "jame25",
+      "repo": "foo_traycontrols"
+    },
+    {
+      "dll": "foo_truepeak",
+      "source": "hyv",
+      "url": "https://foobar.hyv.fi/?view=foo_truepeak"
+    },
+    {
+      "dll": "foo_tun_midi",
+      "source": "github",
+      "owner": "kartun83",
+      "repo": "foo_tun_midi"
+    },
+    {
+      "dll": "foo_ui_columns",
+      "source": "github",
+      "owner": "reupen",
+      "repo": "columns_ui"
+    },
+    {
+      "dll": "foo_ui_localization",
+      "source": "github",
+      "owner": "shooterspps",
+      "repo": "foo_ui_localization"
+    },
+    {
+      "dll": "foo_ui_webview2",
+      "source": "github",
+      "owner": "NereaFantasia",
+      "repo": "foo_ui_webview2"
+    },
+    {
+      "dll": "foo_ui_wizard",
+      "source": "github",
+      "owner": "The-Wizardium",
+      "repo": "UI-Wizard"
+    },
+    {
+      "dll": "foo_uie_albumart_mod",
+      "source": "github",
+      "owner": "Duny",
+      "repo": "foo_uie_albumart_mod"
+    },
+    {
+      "dll": "foo_uie_albumlist",
+      "source": "github",
+      "owner": "reupen",
+      "repo": "album_list_panel"
+    },
+    {
+      "dll": "foo_uie_console",
+      "source": "github",
+      "owner": "reupen",
+      "repo": "console_panel"
+    },
+    {
+      "dll": "foo_uie_eslyric",
+      "source": "github",
+      "owner": "ESLyric",
+      "repo": "release"
+    },
+    {
+      "dll": "foo_uie_jsplitter",
+      "source": "github",
+      "owner": "dima-lur",
+      "repo": "jsplitter"
+    },
+    {
+      "dll": "foo_uie_output_switcher",
+      "source": "github",
+      "owner": "Chocobo1",
+      "repo": "foo_uie_output_switcher"
+    },
+    {
+      "dll": "foo_uie_playlist_tree",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_uie_playlist_tree"
+    },
+    {
+      "dll": "foo_uie_typefind",
+      "source": "github",
+      "owner": "reupen",
+      "repo": "typefind_panel"
+    },
+    {
+      "dll": "foo_uie_webview",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_uie_webview"
+    },
+    {
+      "dll": "foo_uie_wsh_panel_mod",
+      "source": "github",
+      "owner": "samithaj",
+      "repo": "foo_uie_wsh_panel_mod"
+    },
+    {
+      "dll": "foo_uie_wsh_panel_mod_plus",
+      "source": "github",
+      "owner": "ttsping",
+      "repo": "foo_uie_wsh_panel_mod_plus"
+    },
+    {
+      "dll": "foo_vbookmark",
+      "source": "github",
+      "owner": "ghDaYuYu",
+      "repo": "foo_vbookmark"
+    },
+    {
+      "dll": "foo_vis_midi",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_vis_midi"
+    },
+    {
+      "dll": "foo_vis_milk2",
+      "source": "github",
+      "owner": "Ci303",
+      "repo": "foo_vis_milk2_dx11-milkdrop2-fixes"
+    },
+    {
+      "dll": "foo_vis_milk2",
+      "source": "github",
+      "owner": "jecassis",
+      "repo": "foo_vis_milk2"
+    },
+    {
+      "dll": "foo_vis_oscilloscope_d2d",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_vis_oscilloscope_d2d"
+    },
+    {
+      "dll": "foo_vis_projectM",
+      "source": "github",
+      "owner": "djdron",
+      "repo": "foo_vis_projectM"
+    },
+    {
+      "dll": "foo_vis_spectrum_analyzer",
+      "source": "github",
+      "owner": "stuerp",
+      "repo": "foo_vis_spectrum_analyzer"
+    },
+    {
+      "dll": "foo_whatsnew",
+      "source": "github",
+      "owner": "stengerh",
+      "repo": "foo_whatsnew"
+    },
+    {
+      "dll": "foo_xspf_1",
+      "source": "github",
+      "owner": "Chocobo1",
+      "repo": "foo_xspf_1"
+    },
+    {
+      "dll": "foo_yaarchive_reader",
+      "source": "github",
+      "owner": "mocukie",
+      "repo": "foo_yaarchive_reader"
+    },
+    {
+      "dll": "foo_youtube_helper",
+      "source": "github",
+      "owner": "NisemonoLiao",
+      "repo": "foo_youtube_helper"
+    },
+    {
+      "dll": "foo_youtube_player",
+      "source": "github",
+      "owner": "zetmar-collab",
+      "repo": "foo_youtube_player"
+    }
+  ],
+  "disabled": [
+    {
+      "dll": "foo_jscript_panel3",
+      "source": "github",
+      "owner": "jscript-panel",
+      "repo": "release",
+      "reason": "Releases page no longer exists as of 2026-08; development appears abandoned"
+    },
+    {
+      "dll": "foo_uie_webview",
+      "source": "github",
+      "owner": "jecassis",
+      "repo": "foo_uie_webview",
+      "reason": ""
+    }
+  ]
+}
+

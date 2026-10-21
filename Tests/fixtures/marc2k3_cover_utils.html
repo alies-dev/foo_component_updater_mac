@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en"><body>
+<!-- Reduced to the article of https://marc2k3.github.io/component/cover-utils/ -->
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+
+<h1 id="cover-utils">Cover Utils<a class="headerlink" href="#cover-utils" title="Permanent link">&para;</a></h1>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>This is a combined replacement for <code>foo_cover_info</code> and
+<code>foo_cover_resizer</code>. If you have either/both installed,
+you must remove them first.</p>
+<p>Note that this uses a separate database for front cover info
+storage so files would need scanning again. Also, different title
+format fields are used for display. See below.</p>
+</div>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>foobar2000</code> <code>2.25</code> or later. 32bit and 64bit are both supported.</li>
+<li><code>Windows 10</code> or later.</li>
+</ul>
+<p><a class="md-button md-button--primary" href="../../files/foo_cover_utils-1.8.fb2k-component">Download <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z"/></svg></span></a></p>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<p>There are 2 ways to use this component. For all users, you can use the <a href="#context-menu">context menu</a>
+on any playlist or library viewer selection.</p>
+<p>If you are running a new enough <code>foobar2000</code> <code>2.26</code> preview, you can use a <code>Post Convert</code> action from the
+<code>foobar2000</code> <a href="#converter">converter</a> setup dialog.</p>
+<h3 id="context-menu">Context menu<a class="headerlink" href="#context-menu" title="Permanent link">&para;</a></h3>
+<p>Use the right click menu on any playlist/library selection and you'll find
+a <code>Cover Utils</code> sub menu.</p>
+<h4 id="resize">Resize<a class="headerlink" href="#resize" title="Permanent link">&para;</a></h4>
+<p>This option will resize existing embedded art. Reading most common image
+types is supported but you must choose <code>JPG</code> or <code>WebP</code> when saving.</p>
+<h4 id="convert-without-resizing">Convert without resizing<a class="headerlink" href="#convert-without-resizing" title="Permanent link">&para;</a></h4>
+<p>Converts existing embedded art without resizing. You must choose
+<code>JPG</code> or <code>WebP</code>.</p>
+<h4 id="browse-for-file-resize-and-attach">Browse for file, resize and attach<a class="headerlink" href="#browse-for-file-resize-and-attach" title="Permanent link">&para;</a></h4>
+<p>This option lets you browse for an image file and will then resize it
+before attaching it to the current selection.</p>
+<h4 id="browse-for-file-convert-and-attach">Browse for file, convert and attach<a class="headerlink" href="#browse-for-file-convert-and-attach" title="Permanent link">&para;</a></h4>
+<p>Use the file picker and then choose to convert the file to <code>JPG</code> or <code>WebP</code>.</p>
+<h4 id="remove-all-except-front">Remove all except front<a class="headerlink" href="#remove-all-except-front" title="Permanent link">&para;</a></h4>
+<p>Since most people only want front covers, this is a handy method for
+removing all the other types.</p>
+<h4 id="scan-for-info">Scan for info<a class="headerlink" href="#scan-for-info" title="Permanent link">&para;</a></h4>
+<p>Because it's not possible to query files for embedded album art within
+<a href="https://www.foobar2000.org">foobar2000</a>, you can use this option
+to process a selection of files and store the results in a database.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The component automatically tracks all updates to front cover
+properties when using built in methods to add/convert/resize etc.
+It's not possible to track changes from native <code>foobar2000</code> album art
+operations so if you do that, files would need re-scanning
+manually.</p>
+</div>
+<p>Data is available in the following fields which are available wherever
+title formatting is supported.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>%cover_utils_front_width%</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>%cover_utils_front_height%</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>%cover_utils_front_format%</code></td>
+<td><code>JPEG</code>, <code>PNG</code>, <code>WebP</code>, etc.</td>
+</tr>
+<tr>
+<td><code>%cover_utils_front_size%</code></td>
+<td>Nicely formatted image size in KB/MB.</td>
+</tr>
+<tr>
+<td><code>%cover_utils_front_bytes%</code></td>
+<td>Raw image size.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Database records are attached to the <code>%path%</code> of each file. Records
+are preserved if files are renamed/moved with <a href="https://wiki.hydrogenaud.io/index.php?title=Foobar2000:File_operations">File operations</a>.
+If files are renamed/moved externally, records would be orphaned and the files would need
+scanning again.</p>
+<p>Records have a lifetime of 4 weeks if they are
+not included in the <code>Media Library</code> or playlist.</p>
+</div>
+<div class="admonition example">
+<p class="admonition-title">Example</p>
+<p>Here's a custom column configuration that would show all information
+if present.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[%cover_utils_front_width%x%cover_utils_front_height%, %cover_utils_front_size%, %cover_utils_front_format%]
+</span></code></pre></div>
+<p><img alt="cover info" src="../../images/cover-info.png" /></p>
+<p>You can also perform playlist/library searches using <a href="https://wiki.hydrogenaud.io/index.php?title=Foobar2000:Query_syntax">query syntax</a> like this:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>%cover_utils_front_width% PRESENT
+</span></code></pre></div>
+</div>
+<h4 id="clear-cover-info">Clear cover info<a class="headerlink" href="#clear-cover-info" title="Permanent link">&para;</a></h4>
+<p>This clears all existing info for the current selection.</p>
+<h3 id="converter">Converter<a class="headerlink" href="#converter" title="Permanent link">&para;</a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This feature requires a recent <code>foobar2000</code> <code>2.26</code> preview version and component
+version <code>1.6</code> or later.</p>
+<p>Component version <code>1.8</code> or later is required for <code>Presets</code> described below.</p>
+</div>
+<p>On the <code>foobar2000</code> converter setup dialog under <code>Other</code>, you must ensure <code>Transfer attached pictures</code> is selected and then
+you can choose to convert/resize when conversion is complete.</p>
+<p><img alt="post action" src="../../images/cover-utils-post-action.png" /></p>
+<p>To make your own presets, you can head to the main <code>Preferences</code> page (<code>File&gt;Preferences&gt;Tools&gt;Cover Utils</code>). After
+adding, they will appear in the drop down list for selection.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>All changes to entries in the list are saved instantly. There is no <code>undo</code>!</p>
+</div>
+<p>Use the <code>Add new</code> button to create a new preset or double click an existing entry to edit.</p>
+<p>The <code>Preset Editor</code> dialog should be self explanatory. You can configure what happens to
+each and every image type independently.</p>
+<p><img alt="preset-editor" src="../../images/cover-utils-preset-editor.png" /></p>
+<h2 id="changes">Changes<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h2>
+<h3 id="18">1.8<a class="headerlink" href="#18" title="Permanent link">&para;</a></h3>
+<ul>
+<li>This is a breaking change for <code>Post Converter</code> action users because previously saved settings will be lost.</li>
+<li>Add <code>Preferences</code> page for creating your own <code>Post Converter</code> presets. See <a href="#converter">here</a>.</li>
+<li>Change internal <code>Resize</code> method so images smaller than the specified target size are still processed/attached.</li>
+<li>A global quality setting for <code>JPG/WebP</code> encoding now exists under <code>File&gt;Preferences&gt;Tools&gt;Cover Utils</code>.</li>
+</ul>
+<h3 id="17">1.7<a class="headerlink" href="#17" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Various <code>converter</code> dialog improvments.</li>
+</ul>
+<h3 id="16">1.6<a class="headerlink" href="#16" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Update to latest <code>foobar2000</code> <code>SDK</code>.</li>
+<li>Add <a href="#converter">converter dialog</a> support.</li>
+</ul>
+<h3 id="15">1.5<a class="headerlink" href="#15" title="Permanent link">&para;</a></h3>
+<ul>
+<li>When <code>converting</code>/<code>resizing</code> existing images, you can now select
+<code>All</code> as an option instead of a singular type.</li>
+</ul>
+<h3 id="14">1.4<a class="headerlink" href="#14" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>foobar2000</code> <code>2.25</code> is now required.</li>
+<li><code>Reload Info</code> is now automatically triggered after batch operations so filesize changes are seen immediately.</li>
+</ul>
+<h3 id="13">1.3<a class="headerlink" href="#13" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Update <code>WebP</code> encoder to latest version.</li>
+<li>Other internal improvements.</li>
+</ul>
+<h3 id="12">1.2<a class="headerlink" href="#12" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix compatibility with future versions of <code>foobar2000</code>.</li>
+</ul>
+<h3 id="11">1.1<a class="headerlink" href="#11" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Bump minimum requirements to <code>foobar2000</code> <code>2.24</code> and <code>Windows 10</code>.</li>
+<li>Compiled with the latest <code>foobar2000</code> <code>SDK</code>.</li>
+</ul>
+<h3 id="10">1.0<a class="headerlink" href="#10" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Initial release</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+</body></html>
