@@ -6,7 +6,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Added
 
-* **Install** in the results window: tick the components with an update, click Install and restart foobar2000 to finish. Only `.fb2k-component` packages with a valid code signature and the same bundle identifier as the installed version are installed; when the installed version has a Developer ID, the new one needs the same Team ID.
+* **Install** in the results window: tick the components with an update, click Install and restart foobar2000 to finish. Only `.fb2k-component` packages with a valid code signature and the same bundle identifier as the installed version are installed; when the installed version has a Developer ID, the new one needs the same Team ID. A package that unpacks to more than 512 MB is refused.
 * **Restore Previous** (right click on a row) brings back the version the last install replaced.
 * **Self update**: this component's own row installs like any other, and Restore Previous works for it too. If a new version of the updater does not load, the README tells how to put the kept version back.
 * Five more components are known out of the box: `foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS` and `foo_richtext_mac`.
@@ -21,7 +21,6 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 * `foo_input_ncm` no longer reports its 2021 Windows release as the latest version.
 * A component whose GitHub releases have no matching package (for example `foo_scrobbler_mac`) is now looked up in the foobar2000.org catalog instead of showing an error. Your own custom sources still stay as you wrote them.
 * The catalog reader accepts pages that say "Supported system:" for a single platform.
-* An install is refused when the unpacked package passes 512 MB, whatever sizes the zip announces. The size is checked about ten times a second, so a little more than 512 MB can be written before the extraction is stopped.
 
 ### Install
 
