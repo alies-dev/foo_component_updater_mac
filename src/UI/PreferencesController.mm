@@ -18,14 +18,14 @@ const CGFloat kMargin = 20;
 const CGFloat kContentWidth = kPageWidth - 2 * kMargin;
 const CGFloat kIndent = 18;
 
-NSString *const kSummary = @"Finds newer versions of components you added, which foobar2000\u2019s own update check does not cover. It never installs anything.";
+NSString *const kSummary = @"Finds newer versions of components you added, which foobar2000\u2019s own update check does not cover, and installs the ones you choose.";
 
 NSString *const kSourcesPlaceholder =
     @"[{ \"dll\": \"foo_example\", \"source\": \"github\",\n   \"owner\": \"author\", \"repo\": \"foo_example\" }]";
 
 NSArray<NSArray<NSString *> *> *helpRows() {
     return @[
-        @[@"Purpose", @"Reports newer versions of the components you added to foobar2000 and lists them in a window. It never downloads or installs anything."],
+        @[@"Purpose", @"Reports newer versions of the components you added to foobar2000 and lists them in a window. Nothing is installed until you tick an update there and click Install; the replaced version is kept for Restore Previous and the change applies after a restart."],
         @[@"Why", @"foobar2000\u2019s Check For New Versions covers foobar2000 only, not components you added. Built in components update with foobar2000 and are not checked here."],
         @[@"Schedule", @"Shortly after foobar2000 starts, then every 6 hours while it is open, once the last check is at least the chosen number of days old. A window opens only when an update is found. Choosing Check For New Versions in foobar2000 runs it too."],
         @[@"Manual", @"Check Now, or Help > Check for Component Updates..."],

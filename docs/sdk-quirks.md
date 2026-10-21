@@ -16,6 +16,14 @@ Facts measured while building this component, with foobar2000 2.26 and `SDK-2026
 * A kill at any point of the apply step is finished by the next start.
 * foobar2000 writes the binary without the execute bit and it still loads.
 
+## Restart and install (used from 0.2.0)
+
+* `standard_commands::main_restart()` relaunches foobar2000 on Mac: the process ends, a new one (new pid) starts by itself and applies `pending/` before the components load. The call does not come back to its caller. Values written to `fb2k::configStore` just before it are kept. Measured with foobar2000 2.26.
+* The install is one `rename()` of `<profile>/foo_component_updater_mac/work/<random>/stage/<name>` to `pending/<name>` (same volume), after the verified bundle was prepared there, so foobar2000 never sees a half written `pending/<name>`.
+* `SecStaticCodeCheckValidity` with `kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode` accepts the foo_abx 2.2.3 package (Developer ID, Team ID 9UF72C5LAW, an extra `Contents/CodeResources` file) and ad hoc signed bundles, and rejects a bundle whose binary was changed after signing.
+* Test of `ditto -x -k` with a zip that holds a symlink entry (target outside) followed by a file below that name: ditto wrote the link entry as a plain file and stopped with "Not a directory", nothing was written outside the target folder. The link walk after extraction still runs, and it is the check for the Restore copy.
+* A Restore Previous of an ad hoc backup over a Developer ID bundle is refused by the Team ID rule; the batch builds both versions with the same kind of signature.
+
 ## Signing and quarantine
 
 * Ad hoc signed bundles load, because foobar2000 has `com.apple.security.cs.disable-library-validation`. Unsigned bundles do not load.
