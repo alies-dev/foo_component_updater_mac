@@ -147,6 +147,8 @@ int main() {
         CHECK(pick("foo_x", {"foo_x-macos.fb2k-component", "foo_x-arm64.fb2k-component"}) == "?", "equal rank fails closed");
         CHECK(pick("foo_x", {"foo_x-macos.zip", "foo_x-universal.zip", "foo_x-1.0.zip"}) == "?", "equal top rank fails closed, zips");
         CHECK(pick("foo_x", {"foo_x-1.0.zip", "foo_x_2.0.zip"}) == "?", "two bare versions fail closed");
+        CHECK(pick("foo_x", {"foo_x-1.0.fb2k-component", "foo_x-1.0+build.fb2k-component"}) == "foo_x-1.0.fb2k-component", "build metadata is not a filename version token");
+        CHECK(pick("foo_x", {"foo_x-1.0+build.zip"}) == "", "only a build-metadata name: no match, catalog fallthrough");
 
         Selection s;
         std::string newestAmbiguous = page({releaseWith("v2.0.0", {"foo_x-macos.zip", "foo_x-arm64.zip"}), releaseWith("v1.0.0", {"foo_x.fb2k-component"})});

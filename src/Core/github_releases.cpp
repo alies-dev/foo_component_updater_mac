@@ -4,6 +4,7 @@
 #include <cctype>
 #include <ctime>
 #include <set>
+#include <string_view>
 
 #include "../upstream/third_party/nlohmann/json.hpp"
 #include "../upstream/update_parse.h"
@@ -73,8 +74,22 @@ std::string normalizeAssetText(std::string s) {
     return s;
 }
 
-bool endsWith(std::string const& s, std::string const& suffix) {
+bool endsWith(std::string_view s, std::string_view suffix) {
     return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+// Filename version token: optional v/V, then digits separated by single dots
+// ("1.2.1", "v0.1.5", "2"). Unlike isValidVersion, no pre-release or build suffix.
+bool isNumericVersionToken(std::string_view t) {
+    if (!t.empty() && (t.front() == 'v' || t.front() == 'V')) t.remove_prefix(1);
+    if (t.empty()) return false;
+    bool digitSeen = false;
+    for (char c : t) {
+        if (std::isdigit(static_cast<unsigned char>(c))) digitSeen = true;
+        else if (c == '.' && digitSeen) digitSeen = false;
+        else return false;
+    }
+    return digitSeen;
 }
 
 // Lower is better: exact name, then a platform suffix, then a bare or versioned
@@ -82,14 +97,15 @@ bool endsWith(std::string const& s, std::string const& suffix) {
 // key, one optional version token, then platform tokens, each after a separator,
 // so "foo_x" never claims "foo_x_y". A zip is accepted for reporting only.
 bool assetScore(std::string const& key, std::string const& name, bool isExact, int& score) {
-    std::string n = normalizeAssetText(name);
+    std::string const normalized = normalizeAssetText(name);
+    std::string_view n = normalized;
     int extension;
     if (endsWith(n, ".fb2k_component")) {
         extension = 0;
-        n.resize(n.size() - 15);
+        n.remove_suffix(15);
     } else if (endsWith(n, ".zip")) {
         extension = 1;
-        n.resize(n.size() - 4);
+        n.remove_suffix(4);
     } else {
         return false;
     }
@@ -100,9 +116,9 @@ bool assetScore(std::string const& key, std::string const& name, bool isExact, i
     for (size_t pos = key.size(); pos < n.size();) {
         if (n[pos] != '_') return false;
         size_t end = std::min(n.find('_', pos + 1), n.size());
-        std::string token = n.substr(pos + 1, end - pos - 1);
+        std::string_view token = n.substr(pos + 1, end - pos - 1);
         if (token == "macos" || token == "mac" || token == "arm64" || token == "universal") ++platforms;
-        else if (!versioned && platforms == 0 && isValidVersion(token)) versioned = true;
+        else if (!versioned && platforms == 0 && isNumericVersionToken(token)) versioned = true;
         else return false;
         pos = end;
     }
