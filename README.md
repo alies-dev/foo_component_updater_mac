@@ -25,7 +25,7 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 ## Features
 
 * A results window with the installed and the latest version of each component, its status and a link to the release notes.
-* Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back.
+* Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back. The updater's own row works the same way.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
 * Checks automatically every few days.
 * Custom sources for components it does not know, see [docs/custom-sources.md](docs/custom-sources.md).
@@ -37,6 +37,16 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 * Before anything is replaced the package must have a valid code signature, the same bundle identifier as the installed component and, when the installed one has a Team ID, the same Team ID. The new version waits in foobar2000's `pending` folder and is applied at the next start.
 * HTTPS only. It contacts GitHub (releases and the shared registry), foobar2000.org and the hosts of custom sources you add, and nothing else.
 * No personal data, no telemetry.
+
+## If an update breaks the updater itself
+
+Restore Previous is in this component's own window, so it cannot help when the new version does not load. The version it replaced is kept in `~/Library/foobar2000-v2/foo_component_updater_mac/backup/foo_component_updater_mac/`. Either install the older `.fb2k-component` from the Releases page through Settings... > Components > `+`, or put the kept copy back and start foobar2000:
+
+```
+cd ~/Library/foobar2000-v2
+mkdir -p user-components/pending/foo_component_updater_mac
+cp -R foo_component_updater_mac/backup/foo_component_updater_mac/foo_component_updater_mac.component user-components/pending/foo_component_updater_mac/
+```
 
 ## For component authors
 
