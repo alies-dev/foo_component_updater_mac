@@ -25,6 +25,13 @@ int main() {
     CHECK(r.version == "1.31.2", "version");
     CHECK(r.downloadPath == "/getcomponent/cae8710f401a39e30da6685e6cd89516/foo_navidrome_1.31.2.fb2k-component", "versioned file name");
 
+    g_context = "foo_scrobbler_mac (singular wording)";
+    r = {};
+    CHECK(parseCatalogPage(fixture("catalog_foo_scrobbler_mac.html"), r, err) == CatalogStatus::Ok, "Supported system: macOS.");
+    CHECK(r.version == "2.0.1", "version");
+    CHECK(r.downloadPath == "/getcomponent/edb85680c16b6c158209617cb7a03d5b/foo_scrobbler_mac-2.0.1.fb2k-component", "download path");
+    CHECK(parseCatalogPage(replaceAll(fixture("catalog_foo_scrobbler_mac.html"), "macOS.", "Windows 64-bit."), r, err) == CatalogStatus::NoMacSupport, "singular line without macOS");
+
     g_context = "foo_openmpt54 (no ARM)";
     r = {};
     CHECK(parseCatalogPage(fixture("catalog_foo_openmpt54.html"), r, err) == CatalogStatus::Ok && r.version == "0.8.9", "macOS listed without Windows ARM");
