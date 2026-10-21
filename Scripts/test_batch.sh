@@ -20,7 +20,7 @@
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
 #   m2-restore   the new version runs (Components list, mapped binary); Restore Previous stages the backup; restart
 #   m2-refuse    the old version runs again, the backup holds the new one; nine bad packages are refused
-#   m2-bomb      a package whose declared sizes pass but which holds 3000 MB: ditto is killed at the 512 MB cap, nothing is staged
+#   m2-bomb      two packages whose declared sizes pass but which hold 3000 MB (plain, and as an AppleDouble resource fork): ditto is killed, nothing is staged
 #   m2-self-*    the component installs its own update (9.9.9), restarts into it, restores its own backup and restarts again
 #   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
 #
@@ -369,7 +369,7 @@ tail = struct.pack("<HHII", count + 1, count + 1, size + len(record), cd_off + l
 open(sys.argv[3], "wb").write(z[:cd_off] + local + z[cd_off:eocd] + record + z[eocd:eocd + 8] + tail + z[eocd + 20:])
 PY
     # self: the installed Debug component with the version string patched to 9.9.9 (same length, so nothing else moves) and signed
-    # ad hoc again, the same bundle identifier. bomb: central directory sizes that pass, 3000 MB of zeros that ditto really writes.
+    # ad hoc again, the same bundle identifier. The bombs: central directory sizes that pass, 3000 MB of zeros that ditto really writes.
     local own="foo_component_updater_mac.component" own_version
     own_version="$(sed -nE 's/^#define[[:space:]]+FCU_VERSION[[:space:]]+"([^"]+)".*/\1/p' "$PROJECT_DIR/src/version.h")"
     mkdir -p "$WORK/self/mac" && ditto "$COMPONENT_DIR/$own" "$WORK/self/mac/$own" && xattr -cr "$WORK/self/mac/$own" || return 1
@@ -382,24 +382,37 @@ open(sys.argv[1], "wb").write(d.replace(old, b"9.9.9\0"))
 PY
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 9.9.9" "$WORK/self/mac/$own/Contents/Info.plist"
     codesign --force --sign - "$WORK/self/mac/$own" >/dev/null 2>&1 && (cd "$WORK/self" && zip -qry "$pk/self.fb2k-component" mac) || return 1
-    python3 - "$pk/bomb.fb2k-component" <<'PY' || return 1
+    python3 - "$pk" <<'PY' || return 1
 import struct, sys, zlib
-zeros, packed, crc, deflater = b"\0" * (1 << 20), bytearray(), 0, zlib.compressobj(1, zlib.DEFLATED, -15)
-for _ in range(3000):
-    packed += deflater.compress(zeros)
-    crc = zlib.crc32(zeros, crc)
-packed += deflater.flush()
-# name, data, method, crc, size in the local header, size in the central directory
-parts = [("mac/foo_abx.component/Contents/Info.plist", b"x", 0, zlib.crc32(b"x"), 1, 1),
-         ("mac/foo_abx.component/Contents/MacOS/foo_abx", b"x", 0, zlib.crc32(b"x"), 1, 1),
-         ("mac/foo_abx.component/Contents/Resources/bomb.bin", bytes(packed), 8, crc, 3000 << 20, 1000)]
-out, directory = bytearray(), bytearray()
-for name, data, method, check, real, declared in parts:
-    n = name.encode()
-    directory += struct.pack("<I6H3I5H2I", 0x02014b50, 20, 20, 0, method, 0, 0x21, check, len(data), declared, len(n), 0, 0, 0, 0, 0o100644 << 16, len(out)) + n
-    out += struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, 0, method, 0, 0x21, check, len(data), real, len(n), 0) + n + data
-out += directory + struct.pack("<IHHHHIIH", 0x06054b50, 0, 0, len(parts), len(parts), len(directory), len(out), 0)
-open(sys.argv[1], "wb").write(out)
+
+def zeros(prefix):  # prefix followed by 3000 MB of zeros, deflated: (data, crc)
+    chunk, crc, deflater = b"\0" * (1 << 20), zlib.crc32(prefix), zlib.compressobj(1, zlib.DEFLATED, -15)
+    packed = bytearray(deflater.compress(prefix))
+    for _ in range(3000):
+        packed += deflater.compress(chunk)
+        crc = zlib.crc32(chunk, crc)
+    return bytes(packed + deflater.flush()), crc
+
+BIG = 3000 << 20
+plain, plain_crc = zeros(b"")
+# AppleDouble header with one entry, the resource fork (id 2), of 3000 MB
+fork, fork_crc = zeros(struct.pack(">IIQQH", 0x00051607, 0x00020000, 0, 0, 1) + struct.pack(">III", 2, 38, BIG))
+small = lambda name: (name, b"x", 0, zlib.crc32(b"x"), 1, 1, 0o100644)
+res = "mac/foo_abx.component/Contents/Resources/"
+base = [small("mac/foo_abx.component/Contents/Info.plist"), small("mac/foo_abx.component/Contents/MacOS/foo_abx")]
+# name, data, method, crc, size in the local header, size in the central directory, unix mode
+variants = {
+    "bomb": base + [(res + "bomb.bin", plain, 8, plain_crc, BIG, 1000, 0o100644)],
+    "forkbomb": base + [small(res + "fork.bin"), ("__MACOSX/" + res + "._fork.bin", fork, 8, fork_crc, BIG + 38, 1000, 0o100644)],
+}
+for variant, parts in variants.items():
+    out, directory = bytearray(), bytearray()
+    for name, data, method, check, real, declared, mode in parts:
+        n = name.encode()
+        directory += struct.pack("<I6H3I5H2I", 0x02014b50, 0x031e, 20, 0, method, 0, 0x21, check, len(data), declared, len(n), 0, 0, 0, 0, (mode << 16) | (0x10 if name.endswith("/") else 0), len(out)) + n
+        out += struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, 0, method, 0, 0x21, check, len(data), real, len(n), 0) + n + data
+    out += directory + struct.pack("<IHHHHIIH", 0x06054b50, 0, 0, len(parts), len(parts), len(directory), len(out), 0)
+    open(f"{sys.argv[1]}/{variant}.fb2k-component", "wb").write(out)
 PY
 }
 

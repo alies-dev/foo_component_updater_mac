@@ -141,6 +141,7 @@ def m2(run, log, previous_pid):
               (menu["title"], menu["enabled"], menu["title_without_backup"], menu["enabled_without_backup"]) == ("Restore Previous (2.2.3)", True, "Restore Previous", False), menu)
     elif run == "m2-bomb":
         refused(log, "bomb", "expands to more than 512 MB")
+        refused(log, "forkbomb", "expands to more than 512 MB")  # the AppleDouble resource fork, written as a plain file, is counted
         check("nothing staged, installed version and backup unchanged",
               (after["staged"], after["installed_version"], after["backup_version"]) == (False, "2.2.1", "2.2.3"), after)
     elif run == "m2-self-install":

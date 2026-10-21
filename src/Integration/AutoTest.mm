@@ -420,7 +420,7 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             attempt("restore", "");
             next = "self-back";
         } else if (scenario == "bomb") {
-            attempt("bomb", pkg("bomb"));
+            for (char const* bad : {"bomb", "forkbomb"}) attempt(bad, pkg(bad));
         } else if (scenario == "team") {
             attempt("other_developer", pkg("good"));
             attempt("forged_team", pkg("forgedteam"));
