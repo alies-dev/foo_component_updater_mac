@@ -349,29 +349,22 @@ with zipfile.ZipFile(sys.argv[2], "a") as z:
     z.writestr("../../zipslip.txt", "x")
 PY
     echo "not a zip" > "$pk/notzip.fb2k-component"
-    # A local entry that the central directory does not list: ditto would extract it, the layout check never saw it.
-    python3 - "$pk/good.fb2k-component" "$pk/hiddenentry.fb2k-component" <<'PY'
-import struct, sys, zlib
-z = open(sys.argv[1], "rb").read()
-eocd = z.rfind(b"PK\x05\x06")
-cd_off, = struct.unpack("<I", z[eocd + 16:eocd + 20])
-name, data = b"extra/hidden.bin", b"hidden"
-local = struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, 0, 0, 0, 0x21, zlib.crc32(data), len(data), len(data), len(name), 0) + name + data
-open(sys.argv[2], "wb").write(z[:cd_off] + local + z[cd_off:eocd + 16] + struct.pack("<I", cd_off + len(local)) + z[eocd + 20:])
-PY
-    # A listed folder with mode 0200 (ditto applies it) hiding an unlisted file: nothing below it can be examined.
-    python3 - "$pk/good.fb2k-component" "$pk/unreadable.fb2k-component" <<'PY'
+    # Two zips with a local entry that the central directory does not list (ditto would extract it, the layout check never saw it):
+    # hiddenentry as it is, unreadable below a listed folder with mode 0200 (ditto applies it), so nothing under it can be examined.
+    python3 - "$pk/good.fb2k-component" "$pk/hiddenentry.fb2k-component" "$pk/unreadable.fb2k-component" <<'PY'
 import struct, sys, zlib
 z = open(sys.argv[1], "rb").read()
 eocd = z.rfind(b"PK\x05\x06")
 count, size, cd_off = struct.unpack("<HII", z[eocd + 10:eocd + 20])
 local_fmt = "<IHHHHHIIIHH"
-folder, name, data = b"extra/", b"extra/hidden.bin", b"hidden"
-local = struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, 0, 0, 0, len(folder), 0) + folder
-local += struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, zlib.crc32(data), len(data), len(data), len(name), 0) + name + data
+name, data = b"extra/hidden.bin", b"hidden"
+hidden = struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, zlib.crc32(data), len(data), len(data), len(name), 0) + name + data
+open(sys.argv[2], "wb").write(z[:cd_off] + hidden + z[cd_off:eocd + 16] + struct.pack("<I", cd_off + len(hidden)) + z[eocd + 20:])
+folder = b"extra/"
+local = struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, 0, 0, 0, len(folder), 0) + folder + hidden
 record = struct.pack("<I6H3I5H2I", 0x02014b50, 0x031e, 20, 0, 0, 0, 0x21, 0, 0, 0, len(folder), 0, 0, 0, 0, (0o40200 << 16) | 0x10, cd_off) + folder
 tail = struct.pack("<HHII", count + 1, count + 1, size + len(record), cd_off + len(local))
-open(sys.argv[2], "wb").write(z[:cd_off] + local + z[cd_off:eocd] + record + z[eocd:eocd + 8] + tail + z[eocd + 20:])
+open(sys.argv[3], "wb").write(z[:cd_off] + local + z[cd_off:eocd] + record + z[eocd:eocd + 8] + tail + z[eocd + 20:])
 PY
 }
 
