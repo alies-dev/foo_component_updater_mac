@@ -2,26 +2,31 @@
 
 A foobar2000 for macOS component that finds newer versions of the components you added to foobar2000, such as visualizations, playlists or decoders from GitHub or foobar2000.org.
 
+<p align="center">
+  <img src="docs/images/results-window.png" alt="The results window listing installed components with installed version, latest version and status" width="720">
+  <br>
+  <em>Help > Check for Component Updates...: every installed component with its installed and latest version.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/preferences.png" alt="The Component Updates preferences page under Tools" width="480">
+  <br>
+  <em>Preferences > Tools > Component Updates: schedule, prereleases and custom sources.</em>
+</p>
+
 Why: foobar2000's Check For New Versions covers foobar2000 only, not components you added. Built in components update with foobar2000 and are not checked here.
 
-Needed if you added components and want to know when they have newer versions. Not needed if you added none, or you prefer to check yourself: turn off automatic checks, or remove this component in Preferences > Components.
+Needed if you added components and want to know when they have newer versions. Not needed if you added none, or you prefer to check yourself: turn off automatic checks, or remove this component in Settings > Components.
 
-Version 0.1.0 only reports. Checking only reports what is available. It lists the installed components, finds where each one is published, compares versions and shows the result. Installing updates arrives in a later release.
+Version 0.1.0 only reports. It lists the installed components, finds where each one is published, compares versions and shows the result. Installing updates arrives in a later release.
 
 ## Install
 
-1. Download `foo_component_updater_mac.fb2k-component` from the Releases page of this repository (the first release is 0.3.0, until then build from source below).
-2. In foobar2000 open Preferences, Components, click `+` and pick the file, or put `foo_component_updater_mac.component` into `~/Library/foobar2000-v2/user-components/foo_component_updater_mac/`.
+1. Download `foo_component_updater_mac.fb2k-component` from the [Releases](https://github.com/alies-dev/foo_component_updater_mac/releases) page.
+2. In foobar2000 open Settings... > Components, click `+` and choose the downloaded file.
 3. Restart foobar2000.
 
-Build from source:
-
-```
-export FB2K_SDK_PATH=/path/to/SDK-2026-10-01   # built SDK libraries, not part of this repository
-./Scripts/build.sh --install                   # unit tests, build, copy into user-components
-```
-
-macOS 12 or newer, Apple Silicon and Intel, ad hoc signed.
+Requires macOS 12 or newer, Apple Silicon or Intel. The component is ad hoc signed.
 
 ## What it does
 
@@ -58,12 +63,6 @@ Custom sources (Preferences, Custom sources) are a JSON array, one object per co
 * No telemetry. The only requests are the registry file, the release data of the sources above and the catalog pages, each with the header `User-Agent: foo_component_updater_mac/<version>`.
 * When GitHub answers with a rate limit, it stops calling GitHub until the time GitHub gives, and tells you that time.
 
-## Releases and CI
-
-GitHub Actions builds every pull request and every push to `main` (unit tests, Release build, `foo_component_updater_mac.fb2k-component` as a workflow artifact). `Scripts/ci_sdk.sh` downloads the foobar2000 SDK, verifies its SHA256 and builds its libraries; you can run it locally too.
-
-A release is made by pushing a tag `vX.Y.Z`. The workflow fails unless `X.Y.Z` equals `FCU_VERSION` in `src/version.h` and `CHANGELOG.md` has a `## [X.Y.Z]` section, whose text becomes the release notes. The release holds `foo_component_updater_mac.fb2k-component` and `SHA256SUMS`.
-
 ## Credits
 
 The update checking logic comes from [foo_component_update_checker](https://github.com/p2ashiura/foo_component_update_checker) by p2ashiura (MIT), pinned in `UPSTREAM`, and its shared registry [foo_component_update_checker-registry](https://github.com/p2ashiura/foo_component_update_checker-registry). The ported files live in `src/upstream/` and every change to them is listed in [docs/sdk-quirks.md](docs/sdk-quirks.md) under "Upstream diff". The build layout follows [JendaT/fb2k-components-mac-suite](https://github.com/JendaT/fb2k-components-mac-suite). JSON parsing by [nlohmann/json](https://github.com/nlohmann/json).
@@ -73,6 +72,19 @@ The update checking logic comes from [foo_component_update_checker](https://gith
 * [docs/sdk-quirks.md](docs/sdk-quirks.md): foobar2000 on Mac, as found.
 * [docs/custom-sources.md](docs/custom-sources.md): the custom sources format, examples and error messages.
 * [docs/component-authors.md](docs/component-authors.md): how to make your component updatable.
+
+## Development
+
+Build from source (macOS 12 or newer, Apple Silicon and Intel, ad hoc signed):
+
+```
+export FB2K_SDK_PATH=/path/to/SDK-2026-10-01   # built SDK libraries, not part of this repository
+./Scripts/build.sh --install                   # unit tests, build, copy into user-components
+```
+
+GitHub Actions builds every pull request and every push to `main` (unit tests, Release build, `foo_component_updater_mac.fb2k-component` as a workflow artifact). `Scripts/ci_sdk.sh` downloads the foobar2000 SDK, verifies its SHA256 and builds its libraries; you can run it locally too.
+
+A release is made by pushing a tag `vX.Y.Z`. The workflow fails unless `X.Y.Z` equals `FCU_VERSION` in `src/version.h` and `CHANGELOG.md` has a `## [X.Y.Z]` section, whose text becomes the release notes. Keep that section short and user visible: a few bullets, no tests or internal items. The release holds `foo_component_updater_mac.fb2k-component` and `SHA256SUMS`.
 
 ## License
 
