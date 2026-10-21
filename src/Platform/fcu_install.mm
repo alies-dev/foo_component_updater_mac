@@ -341,7 +341,10 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
         if (!check.ok) throw std::runtime_error(check.error);
 
         NSString *extracted = join(job.work, @"x");
-        run({"/usr/bin/ditto", "-x", "-k", "--noqtn", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort, "Could not extract the package.", extracted);
+        // Without --norsrc and --noextattr ditto turns AppleDouble entries (__MACOSX/._x) into resource forks and attributes, which the
+        // size watchdog does not see; as plain files they are counted. A bundle needs neither: its signature lives in files.
+        run({"/usr/bin/ditto", "-x", "-k", "--noqtn", "--norsrc", "--noextattr", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort,
+            "Could not extract the package.", extracted);
         requireOnlyListed(extracted, check.entries);
         // A zip can hold links: both levels must be real folders before anything is moved out of them.
         NSString *source = join(join(extracted, @"mac"), ns(name + ".component"));
