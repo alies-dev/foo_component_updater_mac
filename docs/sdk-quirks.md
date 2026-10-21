@@ -21,6 +21,13 @@ Facts measured while building this component, with foobar2000 2.26 and `SDK-2026
 * Ad hoc signed bundles load, because foobar2000 has `com.apple.security.cs.disable-library-validation`. Unsigned bundles do not load.
 * A bundle with `com.apple.quarantine` does not load, delays startup to about 12 seconds and makes macOS show a "Not Opened" dialog on every start. Files downloaded with `NSURLSession` inside foobar2000 carry no quarantine attribute.
 
+## Downloaded packages and quarantine
+
+* A `.fb2k-component` downloaded with Safari carries `com.apple.quarantine` (`0083;...;Safari`).
+* Installing that file through Settings > Components (the `+` button) produced a bundle without any quarantine attribute. It loaded, and the mapped binary matched the release SHA256 `6f517079b7f2fc311ffb1e614e86bd2aa7d0d5caea81523d3ebc3fd07c90e691`. There was no Gatekeeper dialog and no AppleSystemPolicy rejection. amfid logs its usual "adhoc signed" notice, as it does for every ad hoc signed component.
+* Contrast with "Signing and quarantine" above: a quarantined bundle placed directly into `user-components` is rejected and triggers the "Not Opened" dialog.
+* Tested 2026-10-21 with foobar2000 2.26 on macOS 26.
+
 ## HTTP
 
 * `http_client` exists on Mac and handles HTTPS, redirects and custom headers, but reading the body of a `304` response blocks for tens of seconds. This component uses `NSURLSession` behind `fcu::httpGet` and never `http_client`.

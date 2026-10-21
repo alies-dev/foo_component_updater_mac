@@ -1,6 +1,6 @@
 # Custom sources
 
-Custom sources tell the updater where a component's author publishes new versions. You need one only when a component shows **No source** in the results window. Most components never need it: the updater already knows many of them from its built in list, the shared registry, the component's own `FB2KUpdateSource` key and the foobar2000.org catalog (see the [README](../README.md#what-it-does)).
+Custom sources tell the updater where a component's author publishes new versions. You need one only when a component shows **No source** in the results window. Most components never need it: the updater already knows many of them from its built in list, the shared registry, the component's own `FB2KUpdateSource` key and the foobar2000.org catalog (see [the order of lookup](component-authors.md#order-of-lookup)).
 
 The box is in Preferences, Tools, Component Updates, under **Custom sources**. Entries you save there come first: they win over every other source for the same component.
 
