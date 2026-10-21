@@ -21,7 +21,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 * `foo_input_ncm` no longer reports its 2021 Windows release as the latest version.
 * A component whose GitHub releases have no matching package (for example `foo_scrobbler_mac`) is now looked up in the foobar2000.org catalog instead of showing an error. Your own custom sources still stay as you wrote them.
 * The catalog reader accepts pages that say "Supported system:" for a single platform.
-* A package can no longer fill the disk: extraction stops as soon as it has written more than 512 MB, whatever sizes the zip announces, and the update is refused.
+* An install is refused when the unpacked package passes 512 MB, whatever sizes the zip announces. The size is checked about ten times a second, so a little more than 512 MB can be written before the extraction is stopped.
 
 ### Install
 
