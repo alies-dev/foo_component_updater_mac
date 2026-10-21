@@ -60,22 +60,70 @@ NSString *rootDir() { return join(userComponentsDir().stringByDeletingLastPathCo
 NSString *backupSlot(std::string const& name) { return join(join(rootDir(), @"backup"), ns(name)); }
 NSString *bundleIn(NSString *dir, std::string const& name) { return join(join(dir, ns(name)), ns(name + ".component")); }
 
-void run(std::vector<std::string> const& args, abort_callback& abort, char const *failure) {
+// What the child has written below `dir`, summed from lstat sizes (links are not followed). A folder or file that cannot be
+// examined (no read access, a failing stat, a walk that ends early) leaves the total partial: its name goes to `unreadable`.
+// Only an entry that vanished between listing and stat is skipped; the child may be creating or removing entries.
+uint64_t writtenBytes(NSString *dir, std::string& unreadable) {
+    char *roots[] = {const_cast<char *>(dir.fileSystemRepresentation), nullptr};
+    FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
+    if (!fts) {
+        unreadable = "the extraction folder";
+        return 0;
+    }
+    uint64_t total = 0;
+    FTSENT *e;
+    while (errno = 0, (e = fts_read(fts))) {
+        if (e->fts_info == FTS_DNR || e->fts_info == FTS_ERR || e->fts_info == FTS_NS) {
+            if (e->fts_errno == ENOENT) continue;
+            unreadable = e->fts_name;
+            break;
+        }
+        if (S_ISREG(e->fts_statp->st_mode)) total += e->fts_statp->st_size;
+    }
+    if (!e && errno != 0 && errno != ENOENT) unreadable = "the extraction folder";
+    fts_close(fts);
+    return total;
+}
+
+// SIGKILL, then wait until the child is gone: a wait cut short by a signal is retried, so no zombie outlives the cleanup of the
+// work folder. Any other error (ECHILD) means there is nothing left to wait for.
+void killAndReap(pid_t pid) {
+    kill(pid, SIGKILL);
+    int status;
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+    }
+}
+
+// Runs a tool and waits for it. With `watch`, the tool is killed once a poll finds more than the package size cap below that
+// folder, or finds output it cannot measure: the zip's own size fields (checked before) are not what ditto follows. Abort kills it too.
+void run(std::vector<std::string> const& args, abort_callback& abort, char const *failure, NSString *watch = nil) {
     std::vector<char *> argv;
     for (auto const& a : args) argv.push_back(const_cast<char *>(a.c_str()));
     argv.push_back(nullptr);
     pid_t pid;
     require(posix_spawn(&pid, argv[0], nullptr, nullptr, argv.data(), environ) == 0, failure);
+    // Empty when the output is fine, otherwise the user readable refusal.
+    auto refusal = [&]() -> std::string {
+        if (!watch) return "";
+        std::string unreadable;
+        uint64_t const bytes = writtenBytes(watch, unreadable);
+        if (!unreadable.empty()) return "The package contains a folder or file that cannot be examined: " + unreadable;
+        if (bytes > kMaxPackageUncompressedBytes) return "The package expands to more than " + std::to_string(kMaxPackageUncompressedBytes >> 20) + " MB.";
+        return "";
+    };
     int status = 0;
     pid_t waited;
+    std::string why;
     while ((waited = waitpid(pid, &status, WNOHANG)) == 0 || (waited < 0 && errno == EINTR)) {
-        if (abort.is_aborting()) {
-            kill(pid, SIGTERM);
-            waitpid(pid, &status, 0);
+        if (abort.is_aborting() || !(why = refusal()).empty()) {
+            killAndReap(pid);
             abort.check();
+            throw std::runtime_error(why);
         }
-        usleep(50 * 1000);
+        usleep(100 * 1000);
     }
+    why = refusal(); // ditto can finish between two polls
+    if (!why.empty()) throw std::runtime_error(why);
     require(waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0, failure);
 }
 
@@ -313,7 +361,10 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
         if (!check.ok) throw std::runtime_error(check.error);
 
         NSString *extracted = join(job.work, @"x");
-        run({"/usr/bin/ditto", "-x", "-k", "--noqtn", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort, "Could not extract the package.");
+        // Without --norsrc and --noextattr ditto turns AppleDouble entries (__MACOSX/._x) into resource forks and attributes, which the
+        // size watchdog does not see; as plain files they are counted. A bundle needs neither: its signature lives in files.
+        run({"/usr/bin/ditto", "-x", "-k", "--noqtn", "--norsrc", "--noextattr", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort,
+            "Could not extract the package.", extracted);
         requireOnlyListed(extracted, check.entries);
         // A zip can hold links: both levels must be real folders before anything is moved out of them.
         NSString *source = join(join(extracted, @"mac"), ns(name + ".component"));

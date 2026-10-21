@@ -5,7 +5,9 @@ Usage: test_batch_check.py <run> <autotest.json> [<stub.log>]
 Runs: real, stub, down, ratelimit, badregistry, triggers
 """
 import json
+import re
 import sys
+from pathlib import Path
 
 failures = 0
 
@@ -97,13 +99,20 @@ def github_requests(log, stub_log, run):
     return len([p for p in stub_paths(stub_log) if p.startswith("/repos/")])
 
 
+SELF_UPDATE = "9.9.9"  # the version of the package the batch serves as the updater's own update
+
+
+def fcu_version():
+    return re.search(r'#define\s+FCU_VERSION\s+"([^"]+)"', (Path(__file__).parent.parent / "src" / "version.h").read_text()).group(1)
+
+
 def refused(log, name, text):
     o = log["outcomes"].get(name, {})
     check(f"{name}: refused with a message about \"{text}\"", o.get("ok") is False and text in o.get("message", ""), o)
 
 
 def m2(run, log, previous_pid):
-    before, after, o = log["before"], log["after"], log["outcomes"]
+    before, after, o = log["before"], log["after"], log.get("outcomes", {})
     if previous_pid:
         check("a new foobar2000 process started (the restart)", before["pid"] != int(previous_pid[0]), before)
     if run == "m2-install":
@@ -130,6 +139,27 @@ def m2(run, log, previous_pid):
         menu = log["restore_menu"]
         check("context menu: Restore Previous (2.2.3) is enabled for foo_abx, disabled without a backup",
               (menu["title"], menu["enabled"], menu["title_without_backup"], menu["enabled_without_backup"]) == ("Restore Previous (2.2.3)", True, "Restore Previous", False), menu)
+    elif run == "m2-bomb":
+        refused(log, "bomb", "expands to more than 512 MB")
+        refused(log, "forkbomb", "expands to more than 512 MB")  # the AppleDouble resource fork, written as a plain file, is counted
+        check("nothing staged, installed version and backup unchanged",
+              (after["staged"], after["installed_version"], after["backup_version"]) == (False, "2.2.1", "2.2.3"), after)
+    elif run == "m2-self-install":
+        own = fcu_version()
+        check("the own row is installable once an update is available", log["block_reason"] == "", log["block_reason"])
+        check(f"the updater runs {own} and has nothing pending", (before["installed_version"], before["staged"]) == (own, False), before)
+        check(f"install staged the new package and kept {own} as the backup",
+              o["install"]["ok"] is True and after["staged"] is True and after["backup_version"] == own and after["installed_version"] == own, log)
+    elif run == "m2-self-restore":
+        own = fcu_version()
+        check(f"after the restart the updater reports {SELF_UPDATE}, nothing pending, the backup is {own}",
+              (before["installed_version"], before["staged"], before["backup_version"]) == (SELF_UPDATE, False, own), before)
+        check(f"Restore Previous staged {own} and the backup now holds {SELF_UPDATE}",
+              o["restore"]["ok"] is True and after["staged"] is True and after["backup_version"] == SELF_UPDATE, log)
+    elif run == "m2-self-back":
+        own = fcu_version()
+        check(f"after the second restart the updater reports {own} again and the backup holds {SELF_UPDATE}",
+              (before["installed_version"], before["staged"], before["backup_version"]) == (own, False, SELF_UPDATE), before)
     elif run == "m2-team":
         refused(log, "other_developer", "different developer")
         refused(log, "forged_team", "different developer")

@@ -16,10 +16,12 @@
 #   badregistry registry entries that must never reach a URL
 #   triggers   Help > Check for Component Updates... and the periodic evaluation (counted checks), and that foobar2000's own update menu titles start none
 #
-# M2 runs four starts of foobar2000 (the first three chained by main_restart() calls of the component itself):
+# M2 runs the install scenarios in the real foobar2000 (the chains are linked by main_restart() calls of the component itself):
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
 #   m2-restore   the new version runs (Components list, mapped binary); Restore Previous stages the backup; restart
 #   m2-refuse    the old version runs again, the backup holds the new one; nine bad packages are refused
+#   m2-bomb      two packages whose declared sizes pass but which hold 3000 MB (plain, and as an AppleDouble resource fork): ditto is killed, nothing is staged
+#   m2-self-*    the component installs its own update (9.9.9), restarts into it, restores its own backup and restarts again
 #   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
@@ -366,6 +368,52 @@ record = struct.pack("<I6H3I5H2I", 0x02014b50, 0x031e, 20, 0, 0, 0, 0x21, 0, 0, 
 tail = struct.pack("<HHII", count + 1, count + 1, size + len(record), cd_off + len(local))
 open(sys.argv[3], "wb").write(z[:cd_off] + local + z[cd_off:eocd] + record + z[eocd:eocd + 8] + tail + z[eocd + 20:])
 PY
+    # self: the installed Debug component with the version string patched to 9.9.9 (same length, so nothing else moves) and signed
+    # ad hoc again, the same bundle identifier. The bombs: central directory sizes that pass, 3000 MB of zeros that ditto really writes.
+    local own="foo_component_updater_mac.component" own_version
+    own_version="$(sed -nE 's/^#define[[:space:]]+FCU_VERSION[[:space:]]+"([^"]+)".*/\1/p' "$PROJECT_DIR/src/version.h")"
+    mkdir -p "$WORK/self/mac" && ditto "$COMPONENT_DIR/$own" "$WORK/self/mac/$own" && xattr -cr "$WORK/self/mac/$own" || return 1
+    python3 - "$WORK/self/mac/$own/Contents/MacOS/foo_component_updater_mac" "$own_version" <<'PY' || return 1
+import sys
+d = open(sys.argv[1], "rb").read()
+old = sys.argv[2].encode() + b"\0"
+assert len(old) == 6 and old in d
+open(sys.argv[1], "wb").write(d.replace(old, b"9.9.9\0"))
+PY
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 9.9.9" "$WORK/self/mac/$own/Contents/Info.plist"
+    codesign --force --sign - "$WORK/self/mac/$own" >/dev/null 2>&1 && (cd "$WORK/self" && zip -qry "$pk/self.fb2k-component" mac) || return 1
+    python3 - "$pk" <<'PY' || return 1
+import struct, sys, zlib
+
+def zeros(prefix):  # prefix followed by 3000 MB of zeros, deflated: (data, crc)
+    chunk, crc, deflater = b"\0" * (1 << 20), zlib.crc32(prefix), zlib.compressobj(1, zlib.DEFLATED, -15)
+    packed = bytearray(deflater.compress(prefix))
+    for _ in range(3000):
+        packed += deflater.compress(chunk)
+        crc = zlib.crc32(chunk, crc)
+    return bytes(packed + deflater.flush()), crc
+
+BIG = 3000 << 20
+plain, plain_crc = zeros(b"")
+# AppleDouble header with one entry, the resource fork (id 2), of 3000 MB
+fork, fork_crc = zeros(struct.pack(">IIQQH", 0x00051607, 0x00020000, 0, 0, 1) + struct.pack(">III", 2, 38, BIG))
+small = lambda name: (name, b"x", 0, zlib.crc32(b"x"), 1, 1, 0o100644)
+res = "mac/foo_abx.component/Contents/Resources/"
+base = [small("mac/foo_abx.component/Contents/Info.plist"), small("mac/foo_abx.component/Contents/MacOS/foo_abx")]
+# name, data, method, crc, size in the local header, size in the central directory, unix mode
+variants = {
+    "bomb": base + [(res + "bomb.bin", plain, 8, plain_crc, BIG, 1000, 0o100644)],
+    "forkbomb": base + [small(res + "fork.bin"), ("__MACOSX/" + res + "._fork.bin", fork, 8, fork_crc, BIG + 38, 1000, 0o100644)],
+}
+for variant, parts in variants.items():
+    out, directory = bytearray(), bytearray()
+    for name, data, method, check, real, declared, mode in parts:
+        n = name.encode()
+        directory += struct.pack("<I6H3I5H2I", 0x02014b50, 0x031e, 20, 0, method, 0, 0x21, check, len(data), declared, len(n), 0, 0, 0, 0, (mode << 16) | (0x10 if name.endswith("/") else 0), len(out)) + n
+        out += struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, 0, method, 0, 0x21, check, len(data), real, len(n), 0) + n + data
+    out += directory + struct.pack("<IHHHHIIH", 0x06054b50, 0, 0, len(parts), len(parts), len(directory), len(out), 0)
+    open(f"{sys.argv[1]}/{variant}.fb2k-component", "wb").write(out)
+PY
 }
 
 # m2_start <scenario>: starts foobar2000 on a scenario of the autotest hook and waits for its log.
@@ -390,12 +438,25 @@ m2_wait() {
     fence < "$log"
 }
 
-# m2_disk <scenario> <sha256 of the foo_abx binary expected on disk and mapped, or empty to skip>: the file system after a step.
+# m2_peak <scenario>: records the largest size (KB) of the work folder until the scenario's log exists.
+m2_peak() {
+    local log="$WORK/autotest-m2-$1.json" max=0 kb
+    for _ in $(seq 1 1200); do
+        [ -s "$log" ] && break
+        kb="$(du -sk "$PROFILE/foo_component_updater_mac/work" 2>/dev/null | cut -f1)"
+        [ "${kb:-0}" -gt "$max" ] && max="$kb"
+        echo "$max" > "$WORK/peak-$1.kb"
+        sleep 0.05
+    done
+}
+
+# m2_disk <scenario> <sha256 of the binary expected on disk and mapped, or empty to skip> [component, default foo_abx]: the file system after a step.
 m2_disk() {
-    local bin="$PROFILE/user-components/foo_abx/foo_abx.component/Contents/MacOS/foo_abx" inode mapped
+    local c="${3:-foo_abx}" bin inode mapped
+    bin="$PROFILE/user-components/$c/$c.component/Contents/MacOS/$c"
     if [ -n "$2" ]; then
         inode="$(stat -f %i "$bin")"
-        mapped="$(grep 'foo_abx.component/Contents/MacOS/foo_abx' "$WORK/lsof-$1.txt" | awk '{print $1}' | sort -u | tr '\n' ' ')"
+        mapped="$(grep "$c.component/Contents/MacOS/$c" "$WORK/lsof-$1.txt" | awk '{print $1}' | sort -u | tr '\n' ' ')"
         if [ "$(sha "$bin")" = "$2" ] && [ "$mapped" = "$inode " ]; then
             say "PASS m2 $1: the binary on disk is ${2:0:12}... and the process maps that very file (inode $inode)"
         else
@@ -408,10 +469,13 @@ m2_disk() {
 run_m2() {
     section "m2: packages for the stub"
     m2_packages && say "PASS packages built: $(ls "$WORK/pkgs" | tr '\n' ' ')" || { fail "building the packages"; exit 1; }
-    local installed="$PROFILE/user-components/foo_abx/foo_abx.component" old_sha good_sha orig_sha port
+    local installed="$PROFILE/user-components/foo_abx/foo_abx.component" old_sha good_sha orig_sha own_sha port
     old_sha="$(sha "$installed/Contents/MacOS/foo_abx")"
+    own_sha="$(sha "$COMPONENT_DIR/foo_component_updater_mac.component/Contents/MacOS/foo_component_updater_mac")"
     good_sha="$(sha "$WORK/good/mac/foo_abx.component/Contents/MacOS/foo_abx")"
     orig_sha="$(sha "$WORK/orig/mac/foo_abx.component/Contents/MacOS/foo_abx")"
+    # The scenarios assume that no component has a backup yet (the profile is restored afterwards).
+    rm -rf "$PROFILE/foo_component_updater_mac/backup"
     PKG_DIR="$WORK/pkgs"
     port="$(free_port)"
     start_stub normal "$port" "$WORK/stub-m2.log" || { fail "stub did not start"; exit 1; }
@@ -429,6 +493,37 @@ run_m2() {
         check_run m2-refuse "$previous"; m2_disk refuse "$old_sha"
         [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after nine refused packages" || fail "m2 refuse: pending/foo_abx exists"
         say "INFO backup.json on disk: $(cat "$PROFILE/foo_component_updater_mac/backup/foo_abx/backup.json")"
+    fi
+    quit_or_stop m2
+
+    # bomb: the 3000 MB package passes the layout check. The work folder is sampled while the scenario runs; ditto must be killed far below that.
+    m2_peak bomb &
+    local sampler=$!
+    if m2_start bomb; then
+        wait "$sampler"
+        check_run m2-bomb
+        local peak; peak="$(cat "$WORK/peak-bomb.kb" 2>/dev/null || echo 0)"
+        [ "$peak" -lt 1500000 ] && say "PASS m2 bomb: the work folder peaked at $((peak / 1024)) MB for a 3000 MB bomb" || fail "m2 bomb: the work folder reached $((peak / 1024)) MB"
+        [ -z "$(pgrep -x ditto)" ] && say "PASS m2 bomb: ditto is not running" || fail "m2 bomb: ditto is still running"
+        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 bomb: nothing pending" || fail "m2 bomb: pending/foo_abx exists"
+        m2_disk bomb ""
+    fi
+    quit_or_stop m2
+
+    # self: the Debug component updates itself to 9.9.9 (restart), Restore Previous brings the installed one back (restart).
+    local self_new_sha
+    self_new_sha="$(sha "$WORK/self/mac/foo_component_updater_mac.component/Contents/MacOS/foo_component_updater_mac")"
+    BATCH_PID=""
+    if m2_start self-install; then
+        check_run m2-self-install
+        previous="$BATCH_PID"
+        if m2_wait self-restore; then
+            check_run m2-self-restore "$previous"; m2_disk self-restore "$self_new_sha" foo_component_updater_mac; previous="$BATCH_PID"
+            if m2_wait self-back; then
+                check_run m2-self-back "$previous"; m2_disk self-back "$own_sha" foo_component_updater_mac
+                [ ! -e "$PROFILE/user-components/pending/foo_component_updater_mac" ] && say "PASS m2 self-back: nothing pending" || fail "m2 self-back: pending/foo_component_updater_mac exists"
+            fi
+        fi
     fi
     quit_or_stop m2
 
