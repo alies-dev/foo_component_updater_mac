@@ -122,7 +122,8 @@ def m2(run, log, previous_pid):
         check("after the restart the Components list shows 2.2.1 again and the backup holds 2.2.3",
               (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.1", False, "2.2.3"), before)
         for name, text in (("tampered", "code signature"), ("wrongid", "bundle identifier"), ("zipslip", "unsafe path"), ("nomac", "no macOS build"),
-                           ("notzip", "not a valid package"), ("missing", "download failed"), ("linkout", "link that points outside")):
+                           ("notzip", "not a valid package"), ("missing", "download failed"), ("linkout", "link that points outside"),
+                           ("hiddenentry", "not in its own listing")):
             refused(log, name, text)
         check("nothing staged, installed version and backup unchanged",
               (after["staged"], after["installed_version"], after["backup_version"]) == (False, "2.2.1", "2.2.3"), after)

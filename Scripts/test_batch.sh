@@ -19,7 +19,7 @@
 # M2 runs four starts of foobar2000 (the first three chained by main_restart() calls of the component itself):
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
 #   m2-restore   the new version runs (Components list, mapped binary); Restore Previous stages the backup; restart
-#   m2-refuse    the old version runs again, the backup holds the new one; seven bad packages are refused
+#   m2-refuse    the old version runs again, the backup holds the new one; eight bad packages are refused
 #   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
@@ -343,6 +343,16 @@ with zipfile.ZipFile(sys.argv[2], "a") as z:
     z.writestr("../../zipslip.txt", "x")
 PY
     echo "not a zip" > "$pk/notzip.fb2k-component"
+    # A local entry that the central directory does not list: ditto would extract it, the layout check never saw it.
+    python3 - "$pk/good.fb2k-component" "$pk/hiddenentry.fb2k-component" <<'PY'
+import struct, sys, zlib
+z = open(sys.argv[1], "rb").read()
+eocd = z.rfind(b"PK\x05\x06")
+cd_off, = struct.unpack("<I", z[eocd + 16:eocd + 20])
+name, data = b"extra/hidden.bin", b"hidden"
+local = struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, 0, 0, 0, 0x21, zlib.crc32(data), len(data), len(data), len(name), 0) + name + data
+open(sys.argv[2], "wb").write(z[:cd_off] + local + z[cd_off:eocd + 16] + struct.pack("<I", cd_off + len(local)) + z[eocd + 20:])
+PY
 }
 
 # m2_start <scenario>: starts foobar2000 on a scenario of the autotest hook and waits for its log.
@@ -404,7 +414,7 @@ run_m2() {
     # Restart 2: the backup is back, and the backup holds the newer version.
     if m2_wait refuse; then
         check_run m2-refuse "$previous"; m2_disk refuse "$old_sha"
-        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after seven refused packages" || fail "m2 refuse: pending/foo_abx exists"
+        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after eight refused packages" || fail "m2 refuse: pending/foo_abx exists"
         say "INFO backup.json on disk: $(cat "$PROFILE/foo_component_updater_mac/backup/foo_abx/backup.json")"
     fi
     quit_fb2k || fail "m2: foobar2000 did not quit"
