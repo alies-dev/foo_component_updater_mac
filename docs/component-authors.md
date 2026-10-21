@@ -5,7 +5,8 @@ This updater finds new versions of third party foobar2000 components. These guid
 ## Publish on GitHub
 
 1. Publish a GitHub Release and attach the package, a `.fb2k-component` file.
-2. Name the package exactly `<file name>.fb2k-component`, where `<file name>` is what the Components page shows in the Module column (`foo_example` for `foo_example.component`). The updater picks the newest release that has an asset with this name, so a repository that holds several components works, and tag prefixes do not matter.
+2. Name the package `<file name>.fb2k-component`, where `<file name>` is what the Components page shows in the Module column (`foo_example` for `foo_example.component`). That exact name is always preferred. The updater also accepts `<file name>` followed by an optional version and any of `macos`, `mac`, `arm64`, `universal`, separated by `-` or `_` and in any letter case (`foo_example-macos.fb2k-component`, `foo_example-1.2.0-macos-arm64.fb2k-component`), and a `.zip` of that form (`foo_example-v1.2.0.zip`), because it only reports versions. Anything else after the name, such as `-bin`, `-win32` or `_extra`, is not a match, so `foo_example` never picks up `foo_example_extra`.
+   The newest release with a matching asset is used, so a repository that holds several components works and tag prefixes do not matter. When that release has several equally good matches (for example `-macos` and `-arm64`), the check fails with an error instead of guessing; keep one macOS package per release.
 3. Use the same version in the tag and in `DECLARE_COMPONENT_VERSION`. Tags are read like this: the whole tag when it is a valid version with an optional `v` (`v1.2.0`, `1.2.0`), otherwise the text after a `-v` that forms a complete valid version (`example-v1.2.0`). Anything else is shown as "Unable to compare".
 4. Mark test builds as prereleases. They are ignored unless the user turns on "Include prereleases".
 5. Keep the package layout `mac/<file name>.component` with an ad hoc signature (`codesign --force --sign - <file name>.component`). A package may also hold Windows files next to `mac/`.
@@ -34,7 +35,9 @@ Rules:
 
 ## Or publish in the official catalog
 
-Components listed on foobar2000.org with macOS under "Supported systems" are found by file name without any of the above, from `https://www.foobar2000.org/components/view/<file name>`.
+Components listed on foobar2000.org with macOS under "Supported system" or "Supported systems" are found by file name without any of the above, from `https://www.foobar2000.org/components/view/<file name>`.
+
+The catalog is also the next step when a GitHub source from the registry, the built in list or `FB2KUpdateSource` has no release with a matching package: the updater then checks the catalog page of the same component. Sources you entered yourself do not fall through.
 
 ## Order of lookup
 
@@ -43,5 +46,5 @@ The first match wins:
 1. Your own mappings (Preferences, Custom sources, see [custom-sources.md](custom-sources.md)).
 2. The `FB2KUpdateSource` key in the component's `Info.plist` (this page).
 3. The shared registry of p2ashiura (`known_components.json`, refreshed at most once a day).
-4. A short built in list of the `foo_jl_*` components by JendaT.
-5. The official foobar2000.org component catalog, for components that list macOS support.
+4. A short built in list: the `foo_jl_*` components by JendaT and a few other GitHub components (`foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS`, `foo_richtext_mac`).
+5. The official foobar2000.org component catalog, for components that list macOS support. Also used when step 2, 3 or 4 points at GitHub but no release has a matching package.
