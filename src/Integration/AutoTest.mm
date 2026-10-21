@@ -376,13 +376,15 @@ json stateOf(std::string const& name, std::string* version = nullptr) {
 }
 
 // The install scenarios of `test_batch.sh m2`, one foobar2000 run each (config key foo_component_updater_mac.debug.m2).
-// Packages come from the stub (/pkg/<name>). install and restore end in main_restart(): they set the scenario
-// of the next run and its log path (this one with the scenario name swapped) before restarting.
+// Packages come from the stub (/pkg/<name>). install, restore, self-install and self-restore end in main_restart(): they set
+// the scenario of the next run and its log path (this one with the scenario name swapped) before restarting. The self-*
+// scenarios work on this component itself, the others on foo_abx.
 void runInstallScenario(std::string const& path, std::string const& scenario) {
     auto log = std::make_shared<json>();
     auto version = std::make_shared<std::string>();
     (*log)["scenario"] = scenario;
-    (*log)["before"] = stateOf("foo_abx", version.get());
+    std::string const name = scenario.rfind("self-", 0) == 0 ? "foo_component_updater_mac" : "foo_abx";
+    (*log)["before"] = stateOf(name, version.get());
     auto installed = GetInstalledComponents();
     auto results = std::make_shared<std::vector<CheckResult>>();
 
@@ -390,7 +392,7 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
       try {
         abort_callback& abort = fb2k::mainAborter();
         auto attempt = [&](std::string const& what, std::string const& url) {
-            fcu::InstallOutcome o = url.empty() ? fcu::restorePrevious("foo_abx", *version, abort) : fcu::installUpdate("foo_abx", *version, url, abort);
+            fcu::InstallOutcome o = url.empty() ? fcu::restorePrevious(name, *version, abort) : fcu::installUpdate(name, *version, url, abort);
             (*log)["outcomes"][what] = {{"ok", o.ok}, {"message", o.message}};
         };
         auto pkg = [](char const* name) { return fcu::endpoint("", std::string("/pkg/") + name); };
@@ -407,15 +409,25 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             attempt("restore", "");
             next = "refuse";
         } else if (scenario == "refuse") {
-            for (char const* name : {"tampered", "wrongid", "zipslip", "nomac", "notzip", "missing", "linkout", "hiddenentry", "unreadable"}) attempt(name, pkg(name));
+            for (char const* bad : {"tampered", "wrongid", "zipslip", "nomac", "notzip", "missing", "linkout", "hiddenentry", "unreadable"}) attempt(bad, pkg(bad));
             *results = RunUpdateCheck(installed, abort);
-        } else {
+        } else if (scenario == "self-install") {
+            // What the results window asks for the own row once the check found a newer version.
+            (*log)["block_reason"] = fcu::installBlockReason(true, name, "https://example.org/x.fb2k-component", name + ".fb2k-component", false);
+            attempt("install", pkg("self"));
+            next = "self-restore";
+        } else if (scenario == "self-restore") {
+            attempt("restore", "");
+            next = "self-back";
+        } else if (scenario == "bomb") {
+            attempt("bomb", pkg("bomb"));
+        } else if (scenario == "team") {
             attempt("other_developer", pkg("good"));
             attempt("forged_team", pkg("forgedteam"));
             attempt("same_developer", pkg("devid"));
         }
         fb2k::inMainThread([=] {
-            (*log)["after"] = stateOf("foo_abx");
+            (*log)["after"] = stateOf(name);
             if (scenario == "refuse") {
                 bool withBackup = false, without = true;
                 std::string title = DebugRestoreMenuItem(*results, "foo_abx", &withBackup);
