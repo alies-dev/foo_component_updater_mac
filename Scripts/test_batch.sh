@@ -19,7 +19,7 @@
 # M2 runs four starts of foobar2000 (the first three chained by main_restart() calls of the component itself):
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
 #   m2-restore   the new version runs (Components list, mapped binary); Restore Previous stages the backup; restart
-#   m2-refuse    the old version runs again, the backup holds the new one; eight bad packages are refused
+#   m2-refuse    the old version runs again, the backup holds the new one; nine bad packages are refused
 #   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
@@ -359,6 +359,20 @@ name, data = b"extra/hidden.bin", b"hidden"
 local = struct.pack("<IHHHHHIIIHH", 0x04034b50, 20, 0, 0, 0, 0x21, zlib.crc32(data), len(data), len(data), len(name), 0) + name + data
 open(sys.argv[2], "wb").write(z[:cd_off] + local + z[cd_off:eocd + 16] + struct.pack("<I", cd_off + len(local)) + z[eocd + 20:])
 PY
+    # A listed folder with mode 0200 (ditto applies it) hiding an unlisted file: nothing below it can be examined.
+    python3 - "$pk/good.fb2k-component" "$pk/unreadable.fb2k-component" <<'PY'
+import struct, sys, zlib
+z = open(sys.argv[1], "rb").read()
+eocd = z.rfind(b"PK\x05\x06")
+count, size, cd_off = struct.unpack("<HII", z[eocd + 10:eocd + 20])
+local_fmt = "<IHHHHHIIIHH"
+folder, name, data = b"extra/", b"extra/hidden.bin", b"hidden"
+local = struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, 0, 0, 0, len(folder), 0) + folder
+local += struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, zlib.crc32(data), len(data), len(data), len(name), 0) + name + data
+record = struct.pack("<I6H3I5H2I", 0x02014b50, 0x031e, 20, 0, 0, 0, 0x21, 0, 0, 0, len(folder), 0, 0, 0, 0, (0o40200 << 16) | 0x10, cd_off) + folder
+tail = struct.pack("<HHII", count + 1, count + 1, size + len(record), cd_off + len(local))
+open(sys.argv[2], "wb").write(z[:cd_off] + local + z[cd_off:eocd] + record + z[eocd:eocd + 8] + tail + z[eocd + 20:])
+PY
 }
 
 # m2_start <scenario>: starts foobar2000 on a scenario of the autotest hook and waits for its log.
@@ -420,7 +434,7 @@ run_m2() {
     # Restart 2: the backup is back, and the backup holds the newer version.
     if m2_wait refuse; then
         check_run m2-refuse "$previous"; m2_disk refuse "$old_sha"
-        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after eight refused packages" || fail "m2 refuse: pending/foo_abx exists"
+        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after nine refused packages" || fail "m2 refuse: pending/foo_abx exists"
         say "INFO backup.json on disk: $(cat "$PROFILE/foo_component_updater_mac/backup/foo_abx/backup.json")"
     fi
     quit_or_stop m2

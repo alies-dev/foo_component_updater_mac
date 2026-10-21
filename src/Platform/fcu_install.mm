@@ -101,12 +101,40 @@ struct Job {
         work = ns(pattern);
     }
     ~Job() {
-        if (work) [fm() removeItemAtPath:work error:nil];
+        if (!work || [fm() removeItemAtPath:work error:nil]) return;
+        // A refused package may carry folders without access rights: give them back, then remove again.
+        try {
+            abort_callback_dummy none;
+            run({"/bin/chmod", "-R", "u+rwX", work.fileSystemRepresentation}, none, "");
+        } catch (...) {
+        }
+        [fm() removeItemAtPath:work error:nil];
     }
 
     NSString *installed() const { return bundleIn(userComponentsDir(), name); }
     NSString *staged() const { return bundleIn(join(work, @"stage"), name); }
 };
+
+// Calls visit for every entry below root (folders before their content). Whatever fts could not read (a folder
+// without read permission, a failing stat, an error that ends the walk) is a refusal: unread content is unexamined.
+void walkTree(NSString *root, std::function<void(FTSENT const *)> const& visit) {
+    char *roots[] = {const_cast<char *>(root.fileSystemRepresentation), nullptr};
+    FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
+    require(fts != nullptr, "Could not read the extracted package.");
+    struct Close {
+        FTS *f;
+        ~Close() { fts_close(f); }
+    } close{fts};
+
+    errno = 0;
+    while (FTSENT *e = fts_read(fts)) {
+        if (e->fts_info == FTS_DNR || e->fts_info == FTS_ERR || e->fts_info == FTS_NS) {
+            throw Refused(std::string("The package contains a folder or file that cannot be examined: ") + e->fts_name);
+        }
+        if (e->fts_info != FTS_DP) visit(e);
+    }
+    require(errno == 0, "The package could not be examined completely.");
+}
 
 // Every entry is a regular file, a folder or a link that resolves inside the bundle; the
 // quarantine attribute is removed and must stay gone (a quarantined bundle does not load).
@@ -115,16 +143,7 @@ void sanitize(NSString *bundle) {
     require(realpath(bundle.fileSystemRepresentation, realRoot), "Could not read the extracted component.");
     std::string const prefix = std::string(realRoot) + "/";
 
-    char *roots[] = {const_cast<char *>(bundle.fileSystemRepresentation), nullptr};
-    FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
-    require(fts != nullptr, "Could not read the extracted component.");
-    struct Close {
-        FTS *f;
-        ~Close() { fts_close(f); }
-    } close{fts};
-
-    while (FTSENT *e = fts_read(fts)) {
-        if (e->fts_info == FTS_DP) continue;
+    walkTree(bundle, [&](FTSENT const *e) {
         if (e->fts_info == FTS_SL || e->fts_info == FTS_SLNONE) {
             char target[PATH_MAX];
             if (!realpath(e->fts_path, target) || (strcmp(target, realRoot) != 0 && strncmp(target, prefix.c_str(), prefix.size()) != 0)) {
@@ -135,7 +154,7 @@ void sanitize(NSString *bundle) {
         }
         removexattr(e->fts_path, "com.apple.quarantine", XATTR_NOFOLLOW);
         require(getxattr(e->fts_path, "com.apple.quarantine", nullptr, 0, 0, XATTR_NOFOLLOW) < 0, "The quarantine flag could not be removed from the package.");
-    }
+    });
 }
 
 id staticCode(NSString *bundle) {
@@ -214,20 +233,13 @@ void requireOnlyListed(NSString *dir, std::vector<std::string> const& listed) {
         while ([path hasSuffix:@"/"]) path = [path substringToIndex:path.length - 1];
         for (; path.length != 0 && ![allowed containsObject:path]; path = path.stringByDeletingLastPathComponent) [allowed addObject:path];
     }
-    char *roots[] = {const_cast<char *>(dir.fileSystemRepresentation), nullptr};
-    FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
-    require(fts != nullptr, "Could not read the extracted package.");
-    struct Close {
-        FTS *f;
-        ~Close() { fts_close(f); }
-    } close{fts};
-    size_t const skip = strlen(roots[0]) + 1;
-    while (FTSENT *e = fts_read(fts)) {
-        if (e->fts_level == 0 || e->fts_info == FTS_DP) continue;
+    size_t const skip = strlen(dir.fileSystemRepresentation) + 1;
+    walkTree(dir, [&](FTSENT const *e) {
+        if (e->fts_level == 0) return;
         if (![allowed containsObject:[ns(e->fts_path + skip) precomposedStringWithCanonicalMapping]]) {
             throw Refused(std::string("The package contains a file that is not in its own listing: ") + (e->fts_path + skip));
         }
-    }
+    });
 }
 
 // Steps shared by install and restore: the new bundle already sits at job.staged(). The old backup is
