@@ -60,16 +60,27 @@ NSString *rootDir() { return join(userComponentsDir().stringByDeletingLastPathCo
 NSString *backupSlot(std::string const& name) { return join(join(rootDir(), @"backup"), ns(name)); }
 NSString *bundleIn(NSString *dir, std::string const& name) { return join(join(dir, ns(name)), ns(name + ".component")); }
 
-// What the child has written below `dir`, summed from lstat sizes (links are not followed). Entries that cannot be read
-// are skipped: the child may be creating or removing them while this walks.
-uint64_t writtenBytes(NSString *dir) {
+// What the child has written below `dir`, summed from lstat sizes (links are not followed). A folder or file that cannot be
+// examined (no read access, a failing stat, a walk that ends early) leaves the total partial: its name goes to `unreadable`.
+// Only an entry that vanished between listing and stat is skipped; the child may be creating or removing entries.
+uint64_t writtenBytes(NSString *dir, std::string& unreadable) {
     char *roots[] = {const_cast<char *>(dir.fileSystemRepresentation), nullptr};
     FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
-    if (!fts) return 0;
-    uint64_t total = 0;
-    while (FTSENT *e = fts_read(fts)) {
-        if (e->fts_info != FTS_NS && e->fts_info != FTS_ERR && S_ISREG(e->fts_statp->st_mode)) total += e->fts_statp->st_size;
+    if (!fts) {
+        unreadable = "the extraction folder";
+        return 0;
     }
+    uint64_t total = 0;
+    FTSENT *e;
+    while (errno = 0, (e = fts_read(fts))) {
+        if (e->fts_info == FTS_DNR || e->fts_info == FTS_ERR || e->fts_info == FTS_NS) {
+            if (e->fts_errno == ENOENT) continue;
+            unreadable = e->fts_name;
+            break;
+        }
+        if (S_ISREG(e->fts_statp->st_mode)) total += e->fts_statp->st_size;
+    }
+    if (!e && errno != 0 && errno != ENOENT) unreadable = "the extraction folder";
     fts_close(fts);
     return total;
 }
@@ -83,27 +94,36 @@ void killAndReap(pid_t pid) {
     }
 }
 
-// Runs a tool and waits for it. With `watch`, the tool is killed once a poll finds more than the package size cap
-// below that folder: the zip's own size fields (checked before) are not what ditto follows. Abort kills it too.
+// Runs a tool and waits for it. With `watch`, the tool is killed once a poll finds more than the package size cap below that
+// folder, or finds output it cannot measure: the zip's own size fields (checked before) are not what ditto follows. Abort kills it too.
 void run(std::vector<std::string> const& args, abort_callback& abort, char const *failure, NSString *watch = nil) {
     std::vector<char *> argv;
     for (auto const& a : args) argv.push_back(const_cast<char *>(a.c_str()));
     argv.push_back(nullptr);
     pid_t pid;
     require(posix_spawn(&pid, argv[0], nullptr, nullptr, argv.data(), environ) == 0, failure);
-    auto overCap = [&] { return watch && writtenBytes(watch) > kMaxPackageUncompressedBytes; };
-    auto tooBig = [] { return std::runtime_error("The package expands to more than " + std::to_string(kMaxPackageUncompressedBytes >> 20) + " MB."); };
+    // Empty when the output is fine, otherwise the user readable refusal.
+    auto refusal = [&]() -> std::string {
+        if (!watch) return "";
+        std::string unreadable;
+        uint64_t const bytes = writtenBytes(watch, unreadable);
+        if (!unreadable.empty()) return "The package contains a folder or file that cannot be examined: " + unreadable;
+        if (bytes > kMaxPackageUncompressedBytes) return "The package expands to more than " + std::to_string(kMaxPackageUncompressedBytes >> 20) + " MB.";
+        return "";
+    };
     int status = 0;
     pid_t waited;
+    std::string why;
     while ((waited = waitpid(pid, &status, WNOHANG)) == 0 || (waited < 0 && errno == EINTR)) {
-        if (abort.is_aborting() || overCap()) {
+        if (abort.is_aborting() || !(why = refusal()).empty()) {
             killAndReap(pid);
             abort.check();
-            throw tooBig();
+            throw std::runtime_error(why);
         }
         usleep(100 * 1000);
     }
-    if (overCap()) throw tooBig(); // ditto can finish between two polls
+    why = refusal(); // ditto can finish between two polls
+    if (!why.empty()) throw std::runtime_error(why);
     require(waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0, failure);
 }
 
