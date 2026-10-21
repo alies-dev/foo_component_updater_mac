@@ -288,6 +288,7 @@ void RunChecks(
     struct Job {
         size_t row;
         RepositoryMappingEntry entry;
+        fcu::SourceOrigin origin;
         bool isCatalog;
     };
     std::vector<Job> jobs;
@@ -312,7 +313,7 @@ void RunChecks(
                 r.errorMessage = "Invalid source: " + rs.invalid;
             } else {
                 r.errorMessage = "Check cancelled.";
-                jobs.push_back({results.size(), rs.entry, rs.origin == fcu::SourceOrigin::Catalog});
+                jobs.push_back({results.size(), rs.entry, rs.origin, rs.origin == fcu::SourceOrigin::Catalog});
             }
         }
         results.push_back(std::move(r));
@@ -338,7 +339,17 @@ void RunChecks(
             [&](int page) { return FetchGitHubReleasesPage(first.owner, first.repo, page, abort); },
             includePrereleases);
         for (size_t j : group.second) {
-            ApplyGitHubOutcome(results[jobs[j].row], outcomes[results[jobs[j].row].dllName]);
+            CheckResult& r = results[jobs[j].row];
+            fcu::AssetOutcome const& outcome = outcomes[r.dllName];
+            if (!fcu::fallsThroughToCatalog(jobs[j].origin, outcome.kind)) {
+                ApplyGitHubOutcome(r, outcome);
+                continue;
+            }
+            // Handled by the catalog pass below, after every GitHub repository.
+            jobs[j].isCatalog = true;
+            r.sourceOrigin = fcu::originLabel(fcu::SourceOrigin::Catalog);
+            r.sourceLabel = "foobar2000.org";
+            AddNote(r, "No release of " + first.owner + "/" + first.repo + " has a matching package, so the foobar2000.org catalog was checked instead.");
         }
     }
 

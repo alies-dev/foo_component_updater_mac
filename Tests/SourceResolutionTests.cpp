@@ -3,6 +3,7 @@
 #include "Fixtures.h"
 #include "../src/Core/source_resolution.h"
 #include "../src/Core/mapping_validation.h"
+#include "../src/Core/github_releases.h"
 
 using namespace fcu;
 
@@ -98,6 +99,15 @@ int main() {
     CHECK(std::string(originLabel(SourceOrigin::Registry)) == "registry", "registry");
     CHECK(std::string(originLabel(SourceOrigin::BuiltIn)) == "built in list", "built in");
     CHECK(std::string(originLabel(SourceOrigin::Catalog)) == "catalog", "catalog");
+
+    g_context = "fall through to the catalog";
+    using Kind = AssetOutcome::Kind;
+    for (SourceOrigin o : {SourceOrigin::InfoPlist, SourceOrigin::Registry, SourceOrigin::BuiltIn}) {
+        CHECK(fallsThroughToCatalog(o, Kind::NotFound), originLabel(o));
+        CHECK(!fallsThroughToCatalog(o, Kind::Found) && !fallsThroughToCatalog(o, Kind::Incomplete) && !fallsThroughToCatalog(o, Kind::Error), "only a definitive no match falls through");
+    }
+    CHECK(!fallsThroughToCatalog(SourceOrigin::User, Kind::NotFound), "user mappings stay final");
+    CHECK(!fallsThroughToCatalog(SourceOrigin::Catalog, Kind::NotFound), "the catalog has nothing after it");
 
     g_context = "registry format";
     std::vector<RepositoryMappingEntry> reg;

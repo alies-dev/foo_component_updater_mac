@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "github_releases.h"
 #include "../upstream/repository_mapping.h"
 
 namespace fcu {
@@ -37,5 +38,10 @@ bool parseRegistryJson(std::string const& text, std::vector<RepositoryMappingEnt
 // Plan section 4 order, first match wins: user mappings, Info.plist key,
 // remote registry, built in list, official catalog. "Core" components get none.
 ResolvedSource resolveSource(std::string const& fileName, BundleSource const& bundle, SourceLists const& lists);
+
+// Whether a GitHub check that ended with this outcome continues with the catalog:
+// only when no release has a matching package, and never for the user's own mapping.
+// Incomplete and failed checks keep their result.
+bool fallsThroughToCatalog(SourceOrigin origin, AssetOutcome::Kind outcome);
 
 } // namespace fcu
