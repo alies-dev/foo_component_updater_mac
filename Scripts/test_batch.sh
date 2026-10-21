@@ -14,7 +14,7 @@
 #   down       stub not listening: network errors, no crash
 #   ratelimit  stub answers 403 with x-ratelimit headers: message, no further API calls
 #   badregistry registry entries that must never reach a URL
-#   triggers   synthetic "Check For New Versions" menu notifications and the periodic evaluation (counted checks)
+#   triggers   Help > Check for Component Updates... and the periodic evaluation (counted checks), and that foobar2000's own update menu titles start none
 #
 # M2 runs four starts of foobar2000 (the first three chained by main_restart() calls of the component itself):
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
@@ -472,7 +472,7 @@ run_against_stub ratelimit ratelimit
 sqlite3 "$CONFIG_DB" "DELETE FROM configInts WHERE name LIKE 'cfg_var.bd0271b2%'; DELETE FROM configStrings WHERE name LIKE 'cfg_var.a308a585%';"
 run_against_stub badregistry badregistry
 
-# ---- run 6: menu trigger and periodic evaluation ----------------------------------------------
+# ---- run 6: manual command, periodic evaluation and the old menu titles ------------------------
 cfg_set_string foo_component_updater_mac.debug.recheck_seconds 2
 STUB_DELAY=0.3 run_against_stub triggers normal
 cfg_delete_string foo_component_updater_mac.debug.recheck_seconds

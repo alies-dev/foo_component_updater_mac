@@ -5,16 +5,6 @@
 using namespace fcu;
 
 int main() {
-    g_context = "menu titles";
-    CHECK(isCoreUpdateMenuTitle("Check For New Versions"), "app menu title");
-    CHECK(isCoreUpdateMenuTitle("Check for new foobar2000 versions"), "Help menu title");
-    CHECK(!isCoreUpdateMenuTitle("Check for Component Updates..."), "our own command");
-    CHECK(!isCoreUpdateMenuTitle("Check for New Versions"), "case sensitive");
-    CHECK(!isCoreUpdateMenuTitle("Check For New Versions..."), "no ellipsis variant");
-    CHECK(!isCoreUpdateMenuTitle(" Check For New Versions"), "no surrounding space");
-    CHECK(!isCoreUpdateMenuTitle("Check for new foobar2000 versions "), "no trailing space");
-    CHECK(!isCoreUpdateMenuTitle(""), "empty title");
-
     g_context = "due (counts from the last check of any kind)";
     const int64_t day = 86400, now = 1700000000;
     CHECK(!isAutomaticCheckDue(false, 0, 7, now), "disabled is never due");

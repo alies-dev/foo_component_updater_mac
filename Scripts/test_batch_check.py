@@ -83,8 +83,8 @@ def jenda_rows(rows):
 
 
 # GitHub release list requests (/repos/.../releases) each run must make: 2 checks' worth is a bug.
-# The checked component and JendaT's suite are one request each; triggers also counts the 5 later
-# checks (menu app title, Help title, periodic, attach, manual reopen, dismiss, concurrent) of the scenario.
+# The checked component and JendaT's suite are one request each; triggers also counts the 7 later
+# checks (the command twice, the command with the window open, periodic, attach, manual reopen, dismiss, concurrent) of the scenario.
 EXPECTED_GITHUB_REQUESTS = {"real": 2, "stub": 2, "down": 2, "ratelimit": 1, "badregistry": 2, "triggers": 16}
 
 
@@ -205,11 +205,11 @@ def main():
         check("valid components in the same run are unaffected", rows.get("foo_jl_spectrum", {}).get("status") == "update_available", rows.get("foo_jl_spectrum"))
     elif run == "triggers":
         t = log.get("triggers", {})
-        check("app menu title twice plus an unrelated title: 1 check begun, 2 triggers handled",
-              t.get("menu_app", {}).get("begun_delta") == 1 and t.get("menu_app", {}).get("handled_delta") == 2, t.get("menu_app"))
-        check("a completed manual check (from the foobar2000 menu item) records the last check time",
-              t.get("menu_app", {}).get("last_check_recorded") is True, t.get("menu_app"))
-        check("Help menu title starts exactly 1 check", t.get("menu_help") == {"begun_delta": 1, "handled_delta": 1}, t.get("menu_help"))
+        check("foobar2000's own update menu titles (app and Help menu) start no check and open no window",
+              t.get("old_menu_titles") == {"begun_delta": 0, "window_open": False}, t.get("old_menu_titles"))
+        check("Help > Check for Component Updates... twice in a row: 1 check begun, its completion is recorded as the last check",
+              t.get("manual", {}).get("begun_delta") == 1 and t.get("manual", {}).get("last_check_recorded") is True, t.get("manual"))
+        check("the command with the window already open starts exactly 1 check", t.get("manual_open_window") == {"begun_delta": 1}, t.get("manual_open_window"))
         p = t.get("periodic", {})
         check("periodic evaluation with the interval elapsed starts exactly 1 more check while the timer keeps firing",
               p.get("begun_delta") == 1 and p.get("ticks_delta", 0) >= 2, p)

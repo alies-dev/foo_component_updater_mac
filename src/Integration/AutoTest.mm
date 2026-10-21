@@ -20,7 +20,6 @@
 #include "../UI/PreferencesController.h"
 #include "../UI/ResultsWindow.h"
 #include "../UI/DebugSnapshot.h"
-#include "MenuTrigger.h"
 #include "../Core/mapping_validation.h"
 #include "../Core/package_layout.h"
 #include "PeriodicCheck.h"
@@ -178,7 +177,8 @@ void whenIdle(std::function<void()> next, int polls = 150) {
     afterSeconds(0.3, next);
 }
 
-// The menu trigger and the periodic evaluation, with counters (see Scripts/test_batch_check.py, run "triggers").
+// The manual entry point, the periodic evaluation and the window attach rules, with counters (see Scripts/test_batch_check.py,
+// run "triggers"), and a check that foobar2000's own update menu titles start nothing.
 // Runs only when foo_component_updater_mac.debug.recheck_seconds is set; restores the settings it touches.
 void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
     pfc::string8 recheck = fb2k::configStore::get()->getConfigString("foo_component_updater_mac.debug.recheck_seconds")->c_str();
@@ -187,7 +187,6 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
 
     auto state = std::make_shared<json>();
     auto begun0 = std::make_shared<int>(0);
-    auto handled0 = std::make_shared<int>(0);
     auto ticks0 = std::make_shared<int>(0);
     bool savedAuto = GetAutomaticCheckEnabled();
     int savedDays = GetAutomaticCheckIntervalDays();
@@ -220,7 +219,7 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         DebugSetAutomaticCheckLastRun((int64_t)time(nullptr) - 3 * 86400);
         *begun0 = DebugChecksBegun();
         bool started = EvaluateAutomaticCheck();
-        postMenuAction("Check For New Versions");
+        ShowUpdateResultWindow();
         afterSeconds(0.02, [=] {
             bool attachedBefore = false;
             long rowsBefore = DebugResultsWindowRows(&attachedBefore);
@@ -228,7 +227,7 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
             bool runningAfterClose = IsUpdateCheckRunning();
             // Reopen and close again while the same check still runs: it attaches to that check (no second
             // one can begin until it is delivered), and the second close dismisses it again.
-            postMenuAction("Check For New Versions");
+            ShowUpdateResultWindow();
             afterSeconds(0.02, [=] {
             bool reopenedAttached = false;
             long reopenedRows = DebugResultsWindowRows(&reopenedAttached);
@@ -249,12 +248,12 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
     auto reopen = [=] {
         DebugCloseResultsWindow();
         *begun0 = DebugChecksBegun();
-        postMenuAction("Check For New Versions");
+        ShowUpdateResultWindow();
         afterSeconds(0.02, [=] {
             bool ownerAttached = true;
             long ownerRows = DebugResultsWindowRows(&ownerAttached);
             DebugCloseResultsWindow();
-            postMenuAction("Check For New Versions");
+            ShowUpdateResultWindow();
             afterSeconds(0.02, [=] {
                 bool attachedWhileRunning = false;
                 long rowsWhileRunning = DebugResultsWindowRows(&attachedWhileRunning);
@@ -278,7 +277,7 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         DebugSetAutomaticCheckLastRun((int64_t)time(nullptr) - 3 * 86400);
         *begun0 = DebugChecksBegun();
         bool started = EvaluateAutomaticCheck();
-        postMenuAction("Check For New Versions");
+        ShowUpdateResultWindow();
         afterSeconds(0.05, [=] {
             bool attachedWhileRunning = false;
             long rowsWhileRunning = DebugResultsWindowRows(&attachedWhileRunning);
@@ -319,32 +318,40 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         });
     };
 
-    // 2. The Help menu title, with the window already open but idle.
-    auto helpTitle = [=] {
+    // 2. Help > Check for Component Updates... with the window already open but idle.
+    auto manualOpenWindow = [=] {
         *begun0 = DebugChecksBegun();
-        *handled0 = DebugMenuTriggersHandled();
-        postMenuAction("Check for new foobar2000 versions");
+        ShowUpdateResultWindow();
         afterSeconds(0.5, [=] {
             whenIdle([=] {
-                (*state)["menu_help"] = {{"begun_delta", DebugChecksBegun() - *begun0}, {"handled_delta", DebugMenuTriggersHandled() - *handled0}};
+                (*state)["manual_open_window"] = {{"begun_delta", DebugChecksBegun() - *begun0}};
                 periodic();
             });
         });
     };
 
-    // 1. The app menu title twice in a row plus an unrelated title: one check, two handled, one ignored.
-    *begun0 = DebugChecksBegun();
-    *handled0 = DebugMenuTriggersHandled();
-    DebugSetAutomaticCheckLastRun(1); // a manual check must record its completion time
-    postMenuAction("Check For New Versions");
-    postMenuAction("Check For New Versions");
-    postMenuAction("Check for Component Updates...");
-    afterSeconds(0.5, [=] {
-        whenIdle([=] {
-            (*state)["menu_app"] = {{"begun_delta", DebugChecksBegun() - *begun0}, {"handled_delta", DebugMenuTriggersHandled() - *handled0},
-                                    {"last_check_recorded", GetAutomaticCheckLastRun() > (int64_t)time(nullptr) - 120}};
-            helpTitle();
+    // 1. The command twice in a row: one check, and its completion is recorded as the last check.
+    auto manual = [=] {
+        *begun0 = DebugChecksBegun();
+        DebugSetAutomaticCheckLastRun(1);
+        ShowUpdateResultWindow();
+        ShowUpdateResultWindow();
+        afterSeconds(0.5, [=] {
+            whenIdle([=] {
+                (*state)["manual"] = {{"begun_delta", DebugChecksBegun() - *begun0},
+                                      {"last_check_recorded", GetAutomaticCheckLastRun() > (int64_t)time(nullptr) - 120}};
+                manualOpenWindow();
+            });
         });
+    };
+
+    // 0. foobar2000's own update menu items no longer start a check of ours.
+    *begun0 = DebugChecksBegun();
+    postMenuAction("Check For New Versions");
+    postMenuAction("Check for new foobar2000 versions");
+    afterSeconds(0.5, [=] {
+        (*state)["old_menu_titles"] = {{"begun_delta", DebugChecksBegun() - *begun0}, {"window_open", IsResultsWindowOpen()}};
+        manual();
     });
 }
 

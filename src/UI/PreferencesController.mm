@@ -27,7 +27,7 @@ NSArray<NSArray<NSString *> *> *helpRows() {
     return @[
         @[@"Purpose", @"Reports newer versions of the components you added to foobar2000 and lists them in a window. Nothing is installed until you tick an update there and click Install; the replaced version is kept for Restore Previous and the change applies after a restart."],
         @[@"Why", @"foobar2000\u2019s Check For New Versions covers foobar2000 only, not components you added. Built in components update with foobar2000 and are not checked here."],
-        @[@"Schedule", @"Shortly after foobar2000 starts, then every 6 hours while it is open, once the last check is at least the chosen number of days old. A window opens only when an update is found. Choosing Check For New Versions in foobar2000 runs it too."],
+        @[@"Schedule", @"Shortly after foobar2000 starts, then every 6 hours while it is open, once the last check is at least the chosen number of days old. A window opens only when an update is found."],
         @[@"Manual", @"Check Now, or Help > Check for Component Updates..."],
         @[@"Needed if", @"You added components and want to know when they have newer versions."],
         @[@"Not needed if", @"You added none, or you prefer to check yourself. Turn off automatic checks, or remove this component in Preferences > Components."],

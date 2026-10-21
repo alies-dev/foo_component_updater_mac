@@ -5,13 +5,8 @@
 
 namespace fcu {
 
-// Titles of foobar2000's own update menu items (verified in foobar2000 2.26): the app
-// menu item and the Help menu item. Exact, case sensitive match; if foobar2000 renames
-// them the trigger silently stops firing.
-bool isCoreUpdateMenuTitle(std::string const& title);
-
 // An automatic check is due when it is enabled and, if a check ever ran, at least
-// intervalDays days have passed since the last check (any kind: manual, from the menus or
+// intervalDays days have passed since the last check (any kind: manual or
 // automatic). A clock that went backwards (now before lastCheck) is never due.
 // lastCheck <= 0 means never.
 bool isAutomaticCheckDue(bool enabled, int64_t lastCheck, int intervalDays, int64_t now);
