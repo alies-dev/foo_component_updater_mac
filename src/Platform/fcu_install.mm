@@ -60,22 +60,42 @@ NSString *rootDir() { return join(userComponentsDir().stringByDeletingLastPathCo
 NSString *backupSlot(std::string const& name) { return join(join(rootDir(), @"backup"), ns(name)); }
 NSString *bundleIn(NSString *dir, std::string const& name) { return join(join(dir, ns(name)), ns(name + ".component")); }
 
-void run(std::vector<std::string> const& args, abort_callback& abort, char const *failure) {
+// What the child has written below `dir`, summed from lstat sizes (links are not followed). Entries that cannot be read
+// are skipped: the child may be creating or removing them while this walks.
+uint64_t writtenBytes(NSString *dir) {
+    char *roots[] = {const_cast<char *>(dir.fileSystemRepresentation), nullptr};
+    FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
+    if (!fts) return 0;
+    uint64_t total = 0;
+    while (FTSENT *e = fts_read(fts)) {
+        if (e->fts_info != FTS_NS && e->fts_info != FTS_ERR && S_ISREG(e->fts_statp->st_mode)) total += e->fts_statp->st_size;
+    }
+    fts_close(fts);
+    return total;
+}
+
+// Runs a tool and waits for it. With `watch`, the tool is killed as soon as it has written more than the package size cap
+// below that folder: the zip's own size fields (checked before) are not what ditto follows. Abort kills it too.
+void run(std::vector<std::string> const& args, abort_callback& abort, char const *failure, NSString *watch = nil) {
     std::vector<char *> argv;
     for (auto const& a : args) argv.push_back(const_cast<char *>(a.c_str()));
     argv.push_back(nullptr);
     pid_t pid;
     require(posix_spawn(&pid, argv[0], nullptr, nullptr, argv.data(), environ) == 0, failure);
+    auto overCap = [&] { return watch && writtenBytes(watch) > kMaxPackageUncompressedBytes; };
+    auto tooBig = [] { return std::runtime_error("The package expands to more than " + std::to_string(kMaxPackageUncompressedBytes >> 20) + " MB."); };
     int status = 0;
     pid_t waited;
     while ((waited = waitpid(pid, &status, WNOHANG)) == 0 || (waited < 0 && errno == EINTR)) {
-        if (abort.is_aborting()) {
-            kill(pid, SIGTERM);
+        if (abort.is_aborting() || overCap()) {
+            kill(pid, SIGKILL);
             waitpid(pid, &status, 0);
             abort.check();
+            throw tooBig();
         }
-        usleep(50 * 1000);
+        usleep(100 * 1000);
     }
+    if (overCap()) throw tooBig(); // ditto can finish between two polls
     require(waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0, failure);
 }
 
@@ -313,7 +333,7 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
         if (!check.ok) throw std::runtime_error(check.error);
 
         NSString *extracted = join(job.work, @"x");
-        run({"/usr/bin/ditto", "-x", "-k", "--noqtn", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort, "Could not extract the package.");
+        run({"/usr/bin/ditto", "-x", "-k", "--noqtn", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort, "Could not extract the package.", extracted);
         requireOnlyListed(extracted, check.entries);
         // A zip can hold links: both levels must be real folders before anything is moved out of them.
         NSString *source = join(join(extracted, @"mac"), ns(name + ".component"));
