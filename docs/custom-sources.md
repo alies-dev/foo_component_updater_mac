@@ -28,7 +28,7 @@ Other fields are rejected. The two groups do not mix: a repository source with a
 
 ### github
 
-The newest release (not a draft, and not a prerelease unless you turned prereleases on) that carries a file named `<dll>.fb2k-component` is used. The version is read from the release tag: the whole tag when it is a version such as `v1.2.0`, otherwise the part after `-v` as in `spectrum-v1.2.0`.
+The newest release (not a draft, and not a prerelease unless you turned prereleases on) that carries a package for `<dll>` is used. A package is `<dll>.fb2k-component` (preferred), or `<dll>` plus an optional version and `macos`, `mac`, `arm64` or `universal`, separated by `-` or `_`, ending in `.fb2k-component` or `.zip` (`foo_example-macos.fb2k-component`, `foo_example-v1.2.0.zip`). Names like `foo_example-bin.zip`, `foo_example-win32.fb2k-component` or `foo_example_extra.fb2k-component` do not match. Within one release the exact name wins, then a platform suffix, then `.fb2k-component` over `.zip`; equally good matches are an error. A GitHub mapping you enter yourself never falls back to the catalog. The version is read from the release tag: the whole tag when it is a version such as `v1.2.0`, otherwise the part after `-v` as in `spectrum-v1.2.0`.
 
 ```json
 [{ "dll": "foo_example",
@@ -130,7 +130,8 @@ A saved entry that cannot find a version shows **Error** with the reason as the 
 | Message | Cause and fix |
 | --- | --- |
 | `Repository or releases not found (HTTP 404)` | The owner or repo is wrong, or the repository is private. |
-| `No release with this component's package was found.` | No release carries a file named `<dll>.fb2k-component`. Check `dll`, or the author publishes under another name. |
+| `No release with this component's package was found.` | No release carries a package for `<dll>` as described under github. Check `dll`, or the author publishes under another name. |
+| `Release v1.2.0 has several equally suitable packages for this component.` | That release has two matches of the same kind, for example `-macos` and `-arm64`. Ask the author to attach one. |
 | `Invalid response: no releases found for this repository.` | The Codeberg repository has no published release. |
 | `Unable to locate the download button on this page (page structure may have changed).` | The marc2k3 page is not a component page of that site. |
 | `Unable to locate the Version field on this page (page structure may have changed).` | The hyv address is not a component page of that site. |

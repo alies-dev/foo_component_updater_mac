@@ -11,6 +11,11 @@
     { "dll": "foo_jl_spectrum", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
     { "dll": "foo_jl_tidal", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
     { "dll": "foo_jl_vectorscope", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
-    { "dll": "foo_jl_wave_seekbar", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" }
+    { "dll": "foo_jl_wave_seekbar", "source": "github", "owner": "JendaT", "repo": "fb2k-components-mac-suite" },
+    { "dll": "foo_mac_scrobble", "source": "github", "owner": "avelytchko", "repo": "foo_mac_scrobble" },
+    { "dll": "foo_vis_projectm_mac", "source": "github", "owner": "Stwarf", "repo": "foo_vis_projectm_mac" },
+    { "dll": "foo_cyan_leaf", "source": "github", "owner": "CyanLeafcomponent", "repo": "cyan-leaf-downloads" },
+    { "dll": "foo_vis_projectMacOS", "source": "github", "owner": "gabitoesmiapodo", "repo": "projectMacOS" },
+    { "dll": "foo_richtext_mac", "source": "github", "owner": "seongbin", "repo": "foo_richtext_mac" }
   ]
 }

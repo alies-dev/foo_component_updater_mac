@@ -54,7 +54,7 @@ CatalogStatus parseCatalogPage(std::string const& rawHtml, CatalogRelease& out, 
         return CatalogStatus::Malformed;
     }
 
-    static const std::regex systemsPattern(R"RX(<p>\s*Supported systems:([^<]*)</p>)RX");
+    static const std::regex systemsPattern(R"RX(<p>\s*Supported systems?:([^<]*)</p>)RX");
     std::set<std::string> systems = matches(html, systemsPattern);
     if (systems.size() != 1) {
         error = systems.empty() ? "Unable to locate the supported systems on the catalog page (page structure may have changed)."

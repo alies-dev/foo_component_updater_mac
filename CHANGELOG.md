@@ -4,6 +4,17 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+* Five more components are known out of the box: `foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS` and `foo_richtext_mac`.
+* GitHub releases are matched by more than the exact `<name>.fb2k-component` file name: `foo_example-macos.fb2k-component`, `foo_example-1.2.0-macos-arm64.fb2k-component` and zips such as `foo_example-v1.2.0.zip` count too.
+
+### Fixed
+
+* `foo_input_ncm` no longer reports its 2021 Windows release as the latest version.
+* A component whose GitHub releases have no matching package (for example `foo_scrobbler_mac`) is now looked up in the foobar2000.org catalog instead of showing an error. Your own custom sources still stay as you wrote them.
+* The catalog reader accepts pages that say "Supported system:" for a single platform.
+
 ## [0.1.0] - 2026-10-21
 
 foobar2000 for Mac checks only its own core for updates. This component checks the components you added.

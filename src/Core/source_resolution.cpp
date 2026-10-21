@@ -98,4 +98,9 @@ ResolvedSource resolveSource(std::string const& fileName, BundleSource const& bu
     return r;
 }
 
+bool fallsThroughToCatalog(SourceOrigin origin, AssetOutcome::Kind outcome) {
+    return outcome == AssetOutcome::Kind::NotFound
+        && (origin == SourceOrigin::InfoPlist || origin == SourceOrigin::Registry || origin == SourceOrigin::BuiltIn);
+}
+
 } // namespace fcu

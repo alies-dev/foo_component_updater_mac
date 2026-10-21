@@ -39,10 +39,15 @@ bool parseReleases(std::string const& body, std::vector<Release>& out, std::stri
 // Returns "" when nothing or more than one candidate qualifies.
 std::string versionFromTag(std::string const& tag);
 
-// First release in list order that is not a draft (nor a prerelease unless
-// enabled) and carries an https asset called assetName.
-bool selectRelease(std::vector<Release> const& releases, std::string const& assetName,
-                   bool includePrereleases, ReleaseMatch& out);
+enum class Selection { Found, NoMatch, Ambiguous };
+
+// The newest release (list order, no draft, no prerelease unless enabled) with an
+// https asset that is a candidate package for componentKey (exact
+// "<key>.fb2k-component", or key plus version and platform suffixes). Older
+// releases are not consulted once one has a candidate. Ambiguous: that release
+// has several equally good candidates (out.tag names it); fail closed.
+Selection selectRelease(std::vector<Release> const& releases, std::string const& componentKey,
+                        bool includePrereleases, ReleaseMatch& out);
 
 // True when the Link header carries rel="next".
 bool hasNextPage(std::string const& linkHeader);
@@ -61,10 +66,11 @@ struct AssetOutcome {
     std::string error;
 };
 
-// One repository, several components (monorepo): pages are requested only
-// while some asset is still unmatched, at most maxPages.
+// One repository, several components (monorepo), keyed by component name: pages
+// are requested only while some component is unmatched, at most maxPages.
+// NotFound means no release has a candidate package; an ambiguous release is an Error.
 std::map<std::string, AssetOutcome> resolveRepository(
-    std::vector<std::string> const& assetNames,
+    std::vector<std::string> const& componentKeys,
     std::function<PageFetch(int page)> const& fetchPage,
     bool includePrereleases, int maxPages = 3);
 
