@@ -6,7 +6,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Added
 
-* **Install** in the results window: tick the components with an update, click Install and restart foobar2000 to finish. Only `.fb2k-component` packages with a valid code signature from the same developer as the installed version are installed.
+* **Install** in the results window: tick the components with an update, click Install and restart foobar2000 to finish. Only `.fb2k-component` packages with a valid code signature and the same bundle identifier as the installed version are installed; when the installed version has a Developer ID, the new one needs the same Team ID.
 * **Restore Previous** (right click on a row) brings back the version the last install replaced.
 * Five more components are known out of the box: `foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS` and `foo_richtext_mac`.
 * GitHub releases are matched by more than the exact `<name>.fb2k-component` file name: `foo_example-macos.fb2k-component`, `foo_example-1.2.0-macos-arm64.fb2k-component` and zips such as `foo_example-v1.2.0.zip` count too.
