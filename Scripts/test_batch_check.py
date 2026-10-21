@@ -97,10 +97,50 @@ def github_requests(log, stub_log, run):
     return len([p for p in stub_paths(stub_log) if p.startswith("/repos/")])
 
 
+def refused(log, name, text):
+    o = log["outcomes"].get(name, {})
+    check(f"{name}: refused with a message about \"{text}\"", o.get("ok") is False and text in o.get("message", ""), o)
+
+
+def m2(run, log, previous_pid):
+    before, after, o = log["before"], log["after"], log["outcomes"]
+    if previous_pid:
+        check("a new foobar2000 process started (the restart)", before["pid"] != int(previous_pid[0]), before)
+    if run == "m2-install":
+        row = log["row"]
+        check("foo_abx shows an update from 2.2.1 to 2.2.3 and is installable",
+              (row["status"], row["installed"], row["latest"], row["block_reason"]) == ("update_available", "2.2.1", "2.2.3", ""), row)
+        check("start state: 2.2.1 installed, nothing staged, no backup", (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.1", False, ""), before)
+        check("install staged the new version and kept 2.2.1 as the backup",
+              o["install"]["ok"] is True and after["staged"] is True and after["backup_version"] == "2.2.1" and after["installed_version"] == "2.2.1", log)
+    elif run == "m2-restore":
+        check("after the restart the Components list shows 2.2.3, nothing pending, the backup is 2.2.1",
+              (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.3", False, "2.2.1"), before)
+        check("Restore Previous staged the backup and the backup now holds 2.2.3",
+              o["restore"]["ok"] is True and after["staged"] is True and after["backup_version"] == "2.2.3", log)
+    elif run == "m2-refuse":
+        check("after the restart the Components list shows 2.2.1 again and the backup holds 2.2.3",
+              (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.1", False, "2.2.3"), before)
+        for name, text in (("tampered", "code signature"), ("wrongid", "bundle identifier"), ("zipslip", "unsafe path"), ("nomac", "no macOS build"),
+                           ("notzip", "not a valid package"), ("missing", "download failed")):
+            refused(log, name, text)
+        check("nothing staged, installed version and backup unchanged",
+              (after["staged"], after["installed_version"], after["backup_version"]) == (False, "2.2.1", "2.2.3"), after)
+        menu = log["restore_menu"]
+        check("context menu: Restore Previous (2.2.3) is enabled for foo_abx, disabled without a backup",
+              (menu["title"], menu["enabled"], menu["title_without_backup"], menu["enabled_without_backup"]) == ("Restore Previous (2.2.3)", True, "Restore Previous", False), menu)
+    elif run == "m2-team":
+        refused(log, "other_developer", "different developer")
+        check("a package from the same Team ID is staged", o["same_developer"]["ok"] is True and after["staged"] is True, log)
+    sys.exit(1 if failures else 0)
+
+
 def main():
     run, path = sys.argv[1], sys.argv[2]
-    stub_log = sys.argv[3] if len(sys.argv) > 3 else None
     log = json.load(open(path))
+    if run.startswith("m2-"):
+        m2(run, log, sys.argv[3:4])
+    stub_log = sys.argv[3] if len(sys.argv) > 3 else None
     rows = rows_by_name(log)
     requests = log["requests"]
     common(log)

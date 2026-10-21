@@ -9,6 +9,7 @@ foo_component_updater_mac.debug.api_base points here:
   /repos/<other>/releases                    404
   /components/view/foo_abx                   foobar2000.org catalog page
   /components/view/<other>                   catalog "No such component." page (HTTP 200, as the real site)
+  /pkg/<name>, /getcomponent/<hash>/<file> package <name>.fb2k-component of --packages (the catalog link serves "good"); 404 when absent
 
 --mode ratelimit answers every /repos/ request with 403 and x-ratelimit-* headers.
 --mode badregistry adds registry entries for foo_jl_vectorscope (owner "a/../b") and foo_jl_scrobble
@@ -31,6 +32,7 @@ def main():
     ap.add_argument("--fixtures", required=True)
     ap.add_argument("--log", required=True)
     ap.add_argument("--delay", type=float, default=0.0, help="seconds to wait before answering /repos/ requests")
+    ap.add_argument("--packages", help="directory with <name>.fb2k-component files")
     ap.add_argument("--mode", choices=["normal", "ratelimit", "badregistry"], default="normal")
     args = ap.parse_args()
     fixtures = Path(args.fixtures)
@@ -74,6 +76,9 @@ def main():
                 return self.reply(200, (fixtures / "catalog_foo_abx.html").read_bytes(), "text/html")
             if path.startswith("/components/view/"):
                 return self.reply(200, (fixtures / "catalog_404.html").read_bytes(), "text/html")
+            if args.packages and (path.startswith("/pkg/") or path.startswith("/getcomponent/")):
+                package = Path(args.packages) / ((path[len("/pkg/"):] if path.startswith("/pkg/") else "good") + ".fb2k-component")
+                return self.reply(200, package.read_bytes(), "application/octet-stream") if package.is_file() else self.reply(404, "not found", "text/plain")
             return self.reply(404, "not found", "text/plain")
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
