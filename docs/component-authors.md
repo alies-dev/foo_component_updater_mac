@@ -38,4 +38,10 @@ Components listed on foobar2000.org with macOS under "Supported systems" are fou
 
 ## Order of lookup
 
-The order in which sources are tried is listed in the [README](../README.md#what-it-does).
+The first match wins:
+
+1. Your own mappings (Preferences, Custom sources, see [custom-sources.md](custom-sources.md)).
+2. The `FB2KUpdateSource` key in the component's `Info.plist` (this page).
+3. The shared registry of p2ashiura (`known_components.json`, refreshed at most once a day).
+4. A short built in list of the `foo_jl_*` components by JendaT.
+5. The official foobar2000.org component catalog, for components that list macOS support.
