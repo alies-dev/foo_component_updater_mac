@@ -330,15 +330,15 @@ void RunChecks(
         RepositoryMappingEntry const& first = jobs[group.second.front()].entry;
         say("Checking " + first.owner + "/" + first.repo + "...");
 
-        std::vector<std::string> assetNames;
-        for (size_t j : group.second) assetNames.push_back(results[jobs[j].row].dllName + ".fb2k-component");
+        std::vector<std::string> keys;
+        for (size_t j : group.second) keys.push_back(results[jobs[j].row].dllName);
 
         auto outcomes = fcu::resolveRepository(
-            assetNames,
+            keys,
             [&](int page) { return FetchGitHubReleasesPage(first.owner, first.repo, page, abort); },
             includePrereleases);
         for (size_t j : group.second) {
-            ApplyGitHubOutcome(results[jobs[j].row], outcomes[results[jobs[j].row].dllName + ".fb2k-component"]);
+            ApplyGitHubOutcome(results[jobs[j].row], outcomes[results[jobs[j].row].dllName]);
         }
     }
 

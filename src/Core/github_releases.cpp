@@ -68,6 +68,48 @@ bool allDigits(std::string const& s) {
     return true;
 }
 
+std::string normalizeAssetText(std::string s) {
+    for (char& c : s) c = c == '-' ? '_' : static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+bool endsWith(std::string const& s, std::string const& suffix) {
+    return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+// Lower is better: exact name, then a platform suffix, then a bare or versioned
+// name; within a rank .fb2k-component beats .zip. A candidate is the normalized
+// key, one optional version token, then platform tokens, each after a separator,
+// so "foo_x" never claims "foo_x_y". A zip is accepted for reporting only.
+bool assetScore(std::string const& key, std::string const& name, bool isExact, int& score) {
+    std::string n = normalizeAssetText(name);
+    int extension;
+    if (endsWith(n, ".fb2k_component")) {
+        extension = 0;
+        n.resize(n.size() - 15);
+    } else if (endsWith(n, ".zip")) {
+        extension = 1;
+        n.resize(n.size() - 4);
+    } else {
+        return false;
+    }
+    if (n.compare(0, key.size(), key) != 0) return false;
+
+    bool versioned = false;
+    int platforms = 0;
+    for (size_t pos = key.size(); pos < n.size();) {
+        if (n[pos] != '_') return false;
+        size_t end = std::min(n.find('_', pos + 1), n.size());
+        std::string token = n.substr(pos + 1, end - pos - 1);
+        if (token == "macos" || token == "mac" || token == "arm64" || token == "universal") ++platforms;
+        else if (!versioned && platforms == 0 && isValidVersion(token)) versioned = true;
+        else return false;
+        pos = end;
+    }
+    score = (isExact ? 0 : platforms > 0 ? 1 : 2) * 2 + extension;
+    return true;
+}
+
 } // namespace
 
 bool parseReleases(std::string const& body, std::vector<Release>& out, std::string& error) {
@@ -121,21 +163,31 @@ std::string versionFromTag(std::string const& tag) {
     return candidate;
 }
 
-bool selectRelease(std::vector<Release> const& releases, std::string const& assetName,
-                   bool includePrereleases, ReleaseMatch& out) {
+Selection selectRelease(std::vector<Release> const& releases, std::string const& componentKey,
+                        bool includePrereleases, ReleaseMatch& out) {
+    std::string const key = normalizeAssetText(componentKey);
+    std::string const exact = componentKey + ".fb2k-component";
     for (auto const& r : releases) {
         if (r.draft || (r.prerelease && !includePrereleases)) continue;
+        ReleaseAsset const* best = nullptr;
+        int bestScore = 0;
+        bool tie = false;
         for (auto const& a : r.assets) {
-            if (a.name != assetName || a.url.rfind("https://", 0) != 0) continue;
-            out.tag = r.tag;
-            out.version = versionFromTag(r.tag);
-            out.releaseUrl = r.htmlUrl;
-            out.downloadUrl = a.url;
-            out.assetName = a.name;
-            return true;
+            int score = 0;
+            if (a.url.rfind("https://", 0) != 0 || !assetScore(key, a.name, a.name == exact, score)) continue;
+            if (best && score == bestScore) tie = true;
+            if (!best || score < bestScore) { best = &a; bestScore = score; tie = false; }
         }
+        if (!best) continue;
+        out.tag = r.tag;
+        if (tie) return Selection::Ambiguous;
+        out.version = versionFromTag(r.tag);
+        out.releaseUrl = r.htmlUrl;
+        out.downloadUrl = best->url;
+        out.assetName = best->name;
+        return Selection::Found;
     }
-    return false;
+    return Selection::NoMatch;
 }
 
 bool hasNextPage(std::string const& linkHeader) {
@@ -143,11 +195,11 @@ bool hasNextPage(std::string const& linkHeader) {
 }
 
 std::map<std::string, AssetOutcome> resolveRepository(
-    std::vector<std::string> const& assetNames,
+    std::vector<std::string> const& componentKeys,
     std::function<PageFetch(int page)> const& fetchPage,
     bool includePrereleases, int maxPages) {
     std::map<std::string, AssetOutcome> result;
-    std::set<std::string> pending(assetNames.begin(), assetNames.end());
+    std::set<std::string> pending(componentKeys.begin(), componentKeys.end());
 
     auto failPending = [&](AssetOutcome::Kind kind, std::string const& error) {
         for (auto const& name : pending) {
@@ -173,13 +225,19 @@ std::map<std::string, AssetOutcome> resolveRepository(
         }
         for (auto it = pending.begin(); it != pending.end();) {
             AssetOutcome o;
-            if (selectRelease(releases, *it, includePrereleases, o.match)) {
-                o.kind = AssetOutcome::Kind::Found;
-                result[*it] = std::move(o);
-                it = pending.erase(it);
-            } else {
+            Selection selection = selectRelease(releases, *it, includePrereleases, o.match);
+            if (selection == Selection::NoMatch) {
                 ++it;
+                continue;
             }
+            if (selection == Selection::Found) {
+                o.kind = AssetOutcome::Kind::Found;
+            } else {
+                o.kind = AssetOutcome::Kind::Error;
+                o.error = "Release " + o.match.tag + " has several equally suitable packages for this component.";
+            }
+            result[*it] = std::move(o);
+            it = pending.erase(it);
         }
         if (pending.empty()) break;
         if (!pf.hasNext) {
