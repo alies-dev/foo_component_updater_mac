@@ -1,5 +1,6 @@
 #include "fcu_install.h"
 
+#include <cerrno>
 #include <climits>
 #include <ctime>
 #include <fts.h>
@@ -71,7 +72,8 @@ void run(std::vector<std::string> const& args, abort_callback& abort, char const
     pid_t pid;
     require(posix_spawn(&pid, argv[0], nullptr, nullptr, argv.data(), environ) == 0, failure);
     int status = 0;
-    while (waitpid(pid, &status, WNOHANG) == 0) {
+    pid_t waited;
+    while ((waited = waitpid(pid, &status, WNOHANG)) == 0 || (waited < 0 && errno == EINTR)) {
         if (abort.is_aborting()) {
             kill(pid, SIGTERM);
             waitpid(pid, &status, 0);
@@ -79,7 +81,7 @@ void run(std::vector<std::string> const& args, abort_callback& abort, char const
         }
         usleep(50 * 1000);
     }
-    require(WIFEXITED(status) && WEXITSTATUS(status) == 0, failure);
+    require(waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0, failure);
 }
 
 // One install or restore: a private work folder, removed on every way out. The caller runs one
@@ -155,33 +157,44 @@ NSString *bundleId(NSString *bundle) {
     return info[@"CFBundleIdentifier"] ?: @"";
 }
 
-// The candidate must be validly signed (ad hoc is fine) and be the same product as the
-// installed bundle: same bundle identifier and, when the installed one has a Team ID, the same Team ID.
+// The candidate must be validly signed (ad hoc is fine) and be the same product as the installed bundle: same bundle
+// identifier and, when the installed one has a Team ID, a signature that chains to Apple with that Team ID.
 void verifyIdentity(NSString *candidate, NSString *installed) {
     id code = staticCode(candidate);
+    NSString *team = teamId(staticCode(installed));
+    SecRequirementRef requirement = nullptr;
+    if (team.length != 0) {
+        // The Team ID field alone is not proof: an ad hoc signature can carry any string there. The requirement ties it to Apple's certificate chain.
+        require([team rangeOfString:@"^[A-Z0-9]{10}$" options:NSRegularExpressionSearch].location != NSNotFound, "The installed component has an unusual Team ID.");
+        NSString *text = [NSString stringWithFormat:@"anchor apple generic and certificate leaf[subject.OU] = \"%@\"", team];
+        require(SecRequirementCreateWithString((__bridge CFStringRef)text, kSecCSDefaultFlags, &requirement) == errSecSuccess, "Could not build the signature requirement.");
+    }
+    id holder = CFBridgingRelease(requirement);
     OSStatus status = SecStaticCodeCheckValidity((__bridge SecStaticCodeRef)code,
-        kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode, nullptr);
+        kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode, (__bridge SecRequirementRef)holder);
+    if (status == errSecCSReqFailed) {
+        throw Refused(std::string("The new version is signed by a different developer than the installed one (Team ID ") + team.UTF8String + ").");
+    }
     if (status != errSecSuccess) {
         NSString *why = CFBridgingRelease(SecCopyErrorMessageString(status, nullptr));
         throw Refused(std::string("The code signature of the new version is not valid (") + (why ? why.UTF8String : "unknown error") + ").");
     }
     require([bundleId(candidate) isEqualToString:bundleId(installed)], "The new version has a different bundle identifier than the installed one.");
-    NSString *installedTeam = teamId(staticCode(installed)), *newTeam = teamId(code);
-    if (installedTeam.length != 0 && ![installedTeam isEqualToString:newTeam]) {
-        throw Refused(std::string("The new version is signed by a different developer than the installed one (installed: ") + installedTeam.UTF8String
-                      + ", new: " + (newTeam.length ? newTeam.UTF8String : "none") + ").");
-    }
 }
 
-// Copies the installed bundle to the single backup slot; the slot is replaced in one step.
-void keepBackup(Job const& job, std::string const& installedVersion, abort_callback& abort) {
+// Copies the installed bundle and its backup.json into the work folder; returns the folder that becomes the backup slot.
+NSString *prepareBackup(Job const& job, std::string const& installedVersion, abort_callback& abort) {
     NSString *fresh = join(job.work, @"backup");
     makeDirectory(fresh);
     run({"/usr/bin/ditto", "--noqtn", job.installed().fileSystemRepresentation, join(fresh, ns(job.name + ".component")).fileSystemRepresentation}, abort,
         "Could not back up the installed version.");
     NSData *json = [NSJSONSerialization dataWithJSONObject:@{@"version": ns(installedVersion), @"saved": @((long long)time(nullptr))} options:0 error:nil];
     require([json writeToFile:join(fresh, @"backup.json") atomically:NO], "Could not back up the installed version.");
+    return fresh;
+}
 
+// Replaces the single backup slot in one step.
+void commitBackup(Job const& job, NSString *fresh) {
     NSString *slot = backupSlot(job.name);
     makeDirectory(slot.stringByDeletingLastPathComponent);
     if ([fm() fileExistsAtPath:slot]) {
@@ -192,19 +205,33 @@ void keepBackup(Job const& job, std::string const& installedVersion, abort_callb
     }
 }
 
-// Steps shared by install and restore: the new bundle already sits at job.staged().
+// Steps shared by install and restore: the new bundle already sits at job.staged(). The old backup is
+// replaced only after the staging worked, and a failing backup swap takes the staging back.
 void finish(Job const& job, std::string const& installedVersion, abort_callback& abort) {
     sanitize(job.staged());
     verifyIdentity(job.staged(), job.installed());
-    keepBackup(job, installedVersion, abort);
+    NSString *fresh = prepareBackup(job, installedVersion, abort);
 
     // The folder moves into place in one rename, so foobar2000 never sees a half written pending/<name>.
     NSString *pending = join(userComponentsDir(), @"pending");
     makeDirectory(pending);
-    NSString *target = join(pending, ns(job.name));
-    [fm() removeItemAtPath:target error:nil]; // an uninstall marker (file) or an older staged folder
-    require(rename(job.staged().stringByDeletingLastPathComponent.fileSystemRepresentation, target.fileSystemRepresentation) == 0,
-            "Could not stage the new version.");
+    NSString *target = join(pending, ns(job.name)), *aside = join(job.work, @"replaced-pending");
+    // An uninstall marker (file) or an older staged folder moves aside, so a failure below can put it back.
+    struct stat st;
+    bool hadPending = lstat(target.fileSystemRepresentation, &st) == 0;
+    require(!hadPending || rename(target.fileSystemRepresentation, aside.fileSystemRepresentation) == 0, "Could not stage the new version.");
+    auto putBack = [&] { if (hadPending) rename(aside.fileSystemRepresentation, target.fileSystemRepresentation); };
+    if (rename(job.staged().stringByDeletingLastPathComponent.fileSystemRepresentation, target.fileSystemRepresentation) != 0) {
+        putBack();
+        throw Refused("Could not stage the new version.");
+    }
+    try {
+        commitBackup(job, fresh);
+    } catch (...) {
+        [fm() removeItemAtPath:target error:nil];
+        putBack();
+        throw;
+    }
 }
 
 InstallOutcome guarded(std::function<void()> const& body) {
