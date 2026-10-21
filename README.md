@@ -58,6 +58,12 @@ Custom sources (Preferences, Custom sources) are a JSON array, one object per co
 * No telemetry. The only requests are the registry file, the release data of the sources above and the catalog pages, each with the header `User-Agent: foo_component_updater_mac/<version>`.
 * When GitHub answers with a rate limit, it stops calling GitHub until the time GitHub gives, and tells you that time.
 
+## Releases and CI
+
+GitHub Actions builds every pull request and every push to `main` (unit tests, Release build, `foo_component_updater_mac.fb2k-component` as a workflow artifact). `Scripts/ci_sdk.sh` downloads the foobar2000 SDK, verifies its SHA256 and builds its libraries; you can run it locally too.
+
+A release is made by pushing a tag `vX.Y.Z`. The workflow fails unless `X.Y.Z` equals `FCU_VERSION` in `src/version.h` and `CHANGELOG.md` has a `## [X.Y.Z]` section, whose text becomes the release notes. The release holds `foo_component_updater_mac.fb2k-component` and `SHA256SUMS`.
+
 ## Credits
 
 The update checking logic comes from [foo_component_update_checker](https://github.com/p2ashiura/foo_component_update_checker) by p2ashiura (MIT), pinned in `UPSTREAM`, and its shared registry [foo_component_update_checker-registry](https://github.com/p2ashiura/foo_component_update_checker-registry). The ported files live in `src/upstream/` and every change to them is listed in [docs/sdk-quirks.md](docs/sdk-quirks.md) under "Upstream diff". The build layout follows [JendaT/fb2k-components-mac-suite](https://github.com/JendaT/fb2k-components-mac-suite). JSON parsing by [nlohmann/json](https://github.com/nlohmann/json).

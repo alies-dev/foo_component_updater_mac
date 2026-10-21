@@ -1,0 +1,31 @@
+name: Build and package
+description: Build the SDK (cached), run the unit tests, build the Release component and package it.
+
+runs:
+  using: composite
+  steps:
+    - name: Select SDK location and toolchain
+      id: toolchain
+      shell: bash
+      run: |
+        echo "FB2K_SDK_PATH=$RUNNER_TEMP/SDK-2026-10-01" >> "$GITHUB_ENV"
+        echo "xcode=$(xcodebuild -version | tr '\n' ' ' | tr -c 'A-Za-z0-9.\n' '-')" >> "$GITHUB_OUTPUT"
+
+    - name: Cache foobar2000 SDK
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/SDK-2026-10-01
+        key: fb2k-sdk-2026-10-01-${{ env.ImageOS }}-${{ runner.arch }}-${{ steps.toolchain.outputs.xcode }}-${{ hashFiles('Scripts/ci_sdk.sh') }}
+
+    - name: Build foobar2000 SDK libraries
+      shell: bash
+      run: Scripts/ci_sdk.sh
+
+    # build.sh runs the unit tests first and aborts the build when they fail.
+    - name: Unit tests and Release build
+      shell: bash
+      run: Scripts/build.sh --release
+
+    - name: Package
+      shell: bash
+      run: Scripts/package.sh

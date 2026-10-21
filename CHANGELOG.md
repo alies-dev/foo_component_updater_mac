@@ -4,6 +4,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+* GitHub Actions CI for pull requests and `main` (unit tests, Release build, package artifact) and a tag driven release workflow (`vX.Y.Z`) that checks the tag against `src/version.h` and `CHANGELOG.md` and publishes `foo_component_updater_mac.fb2k-component` with `SHA256SUMS`.
+* `Scripts/ci_sdk.sh`: downloads, verifies and builds the foobar2000 SDK libraries.
+
 ## [0.1.0] - 2026-10-21
 
 First version. Notify only.
