@@ -1,6 +1,6 @@
 .DS_Store
 SDK-*/
-build/
+/build/
 DerivedData/
 *.xcodeproj/
 *.component
