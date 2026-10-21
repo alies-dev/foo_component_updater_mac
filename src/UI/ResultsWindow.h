@@ -32,6 +32,8 @@ long DebugResultsWindowRows(bool* attached);
 // Status line of the open window ("" when closed), and a click on its "Show built in components" checkbox.
 std::string DebugResultsStatus();
 void DebugToggleBuiltIn();
+// Title and enabled state of the "Restore Previous" context menu item of the row for component `name` ("" when no such row).
+std::string DebugRestoreMenuItem(std::vector<CheckResult> const& results, std::string const& name, bool* enabled);
 // Widths of the window, scroll view, table and columns as of the last snapshot.
 std::string DebugLastResultsLayout();
 // Builds the window off screen, fills it and creates every table cell, so the
