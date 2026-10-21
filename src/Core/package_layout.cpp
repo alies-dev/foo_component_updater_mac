@@ -69,6 +69,7 @@ PackageCheck checkPackageLayout(std::string_view zip, std::string const& name) {
     std::string otherBundle;
     bool hasMac = false, hasPlist = false, hasExecutable = false;
     uint64_t total = 0;
+    std::vector<std::string> entries;
 
     size_t at = 0;
     for (uint32_t i = 0; i < count; ++i) {
@@ -86,6 +87,7 @@ PackageCheck checkPackageLayout(std::string_view zip, std::string const& name) {
             return fail("The package expands to more than " + std::to_string(kMaxPackageUncompressedBytes >> 20) + " MB.");
         }
         if (isUnsafeName(entry)) return fail("The package contains an unsafe path: " + printable(entry));
+        entries.emplace_back(entry);
 
         if (startsWith(entry, "mac/")) {
             hasMac = true;
@@ -111,6 +113,7 @@ PackageCheck checkPackageLayout(std::string_view zip, std::string const& name) {
 
     PackageCheck ok;
     ok.ok = true;
+    ok.entries = std::move(entries);
     return ok;
 }
 

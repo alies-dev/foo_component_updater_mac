@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace fcu {
 
@@ -12,7 +13,8 @@ inline constexpr uint64_t kMaxPackageUncompressedBytes = 512ull * 1024 * 1024;
 
 struct PackageCheck {
     bool ok = false;
-    std::string error; // user readable, set when !ok
+    std::string error;                // user readable, set when !ok
+    std::vector<std::string> entries; // every name the central directory lists, set when ok
 };
 
 // Reads the zip central directory of `zip` (the whole file) and accepts it only when it is

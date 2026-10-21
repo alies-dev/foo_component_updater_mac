@@ -205,6 +205,31 @@ void commitBackup(Job const& job, NSString *fresh) {
     }
 }
 
+// Fails when ditto extracted something the central directory (read by the layout check) does not list: the local
+// headers can announce more than it does. Folders that listed paths pass through are fine.
+void requireOnlyListed(NSString *dir, std::vector<std::string> const& listed) {
+    NSMutableSet<NSString *> *allowed = [NSMutableSet set];
+    for (auto const& entry : listed) {
+        NSString *path = [ns(entry) precomposedStringWithCanonicalMapping];
+        while ([path hasSuffix:@"/"]) path = [path substringToIndex:path.length - 1];
+        for (; path.length != 0 && ![allowed containsObject:path]; path = path.stringByDeletingLastPathComponent) [allowed addObject:path];
+    }
+    char *roots[] = {const_cast<char *>(dir.fileSystemRepresentation), nullptr};
+    FTS *fts = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, nullptr);
+    require(fts != nullptr, "Could not read the extracted package.");
+    struct Close {
+        FTS *f;
+        ~Close() { fts_close(f); }
+    } close{fts};
+    size_t const skip = strlen(roots[0]) + 1;
+    while (FTSENT *e = fts_read(fts)) {
+        if (e->fts_level == 0 || e->fts_info == FTS_DP) continue;
+        if (![allowed containsObject:[ns(e->fts_path + skip) precomposedStringWithCanonicalMapping]]) {
+            throw Refused(std::string("The package contains a file that is not in its own listing: ") + (e->fts_path + skip));
+        }
+    }
+}
+
 // Steps shared by install and restore: the new bundle already sits at job.staged(). The old backup is
 // replaced only after the staging worked, and a failing backup swap takes the staging back.
 void finish(Job const& job, std::string const& installedVersion, abort_callback& abort) {
@@ -215,23 +240,34 @@ void finish(Job const& job, std::string const& installedVersion, abort_callback&
     // The folder moves into place in one rename, so foobar2000 never sees a half written pending/<name>.
     NSString *pending = join(userComponentsDir(), @"pending");
     makeDirectory(pending);
-    NSString *target = join(pending, ns(job.name)), *aside = join(job.work, @"replaced-pending");
-    // An uninstall marker (file) or an older staged folder moves aside, so a failure below can put it back.
+    // An uninstall marker (file) or an older staged folder moves aside, outside the work folder (which is wiped),
+    // so a failure below can put it back and nothing deletes it unless the install worked.
+    NSString *target = join(pending, ns(job.name)), *aside = join(rootDir(), ns("previous-pending-" + job.name));
     struct stat st;
     bool hadPending = lstat(target.fileSystemRepresentation, &st) == 0;
-    require(!hadPending || rename(target.fileSystemRepresentation, aside.fileSystemRepresentation) == 0, "Could not stage the new version.");
-    auto putBack = [&] { if (hadPending) rename(aside.fileSystemRepresentation, target.fileSystemRepresentation); };
+    if (hadPending) {
+        if (lstat(aside.fileSystemRepresentation, &st) == 0) {
+            throw Refused(std::string("An earlier pending entry was left at ") + aside.fileSystemRepresentation + "; move it away first.");
+        }
+        require(rename(target.fileSystemRepresentation, aside.fileSystemRepresentation) == 0, "Could not stage the new version.");
+    }
+    auto putBack = [&](char const *why) {
+        if (hadPending && rename(aside.fileSystemRepresentation, target.fileSystemRepresentation) != 0) {
+            throw Refused(std::string(why) + " The previous pending entry could not be put back and was left at " + aside.fileSystemRepresentation + ".");
+        }
+    };
     if (rename(job.staged().stringByDeletingLastPathComponent.fileSystemRepresentation, target.fileSystemRepresentation) != 0) {
-        putBack();
+        putBack("Could not stage the new version.");
         throw Refused("Could not stage the new version.");
     }
     try {
         commitBackup(job, fresh);
     } catch (...) {
         [fm() removeItemAtPath:target error:nil];
-        putBack();
+        putBack("Could not store the backup.");
         throw;
     }
+    if (hadPending) [fm() removeItemAtPath:aside error:nil];
 }
 
 InstallOutcome guarded(std::function<void()> const& body) {
@@ -268,6 +304,7 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
 
         NSString *extracted = join(job.work, @"x");
         run({"/usr/bin/ditto", "-x", "-k", "--noqtn", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort, "Could not extract the package.");
+        requireOnlyListed(extracted, check.entries);
         // A zip can hold links: both levels must be real folders before anything is moved out of them.
         NSString *source = join(join(extracted, @"mac"), ns(name + ".component"));
         if (!isRealDirectory(join(extracted, @"mac")) || !isRealDirectory(source)) throw Refused("The package does not hold a plain mac/" + name + ".component folder.");

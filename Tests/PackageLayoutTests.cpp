@@ -3,6 +3,7 @@
 #include "Fixtures.h"
 #include "../src/Core/package_layout.h"
 
+#include <algorithm>
 #include <vector>
 
 using namespace fcu;
@@ -59,6 +60,12 @@ bool mentions(std::string const& text, char const* needle) { return text.find(ne
 int main() {
     g_context = "ditto fixtures";
     CHECK(accepts(fixture("pkg_valid.zip")), "valid mac layout");
+    {
+        PackageCheck c = checkPackageLayout(fixture("pkg_valid.zip"), "foo_test");
+        CHECK_EQ(c.entries.size(), 6, "all six central directory names are listed");
+        CHECK(std::find(c.entries.begin(), c.entries.end(), "mac/foo_test.component/Contents/Info.plist") != c.entries.end(), "Info.plist is listed");
+        CHECK(checkPackageLayout(fixture("pkg_nomac.zip"), "foo_test").entries.empty(), "a refused package lists nothing");
+    }
     CHECK(accepts(fixture("pkg_multi.zip")), "multi platform layout (dll, x64, arm64ec ignored)");
     CHECK(!accepts(fixture("pkg_valid.zip"), "Foo_Test"), "the name is case sensitive");
     CHECK(!accepts(fixture("pkg_valid.zip"), "foo_tes"), "no prefix match on the name");
