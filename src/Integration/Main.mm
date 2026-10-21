@@ -16,7 +16,8 @@ DECLARE_COMPONENT_VERSION(
     "Component Updater",
     FCU_VERSION,
     "Checks installed third party components for newer versions and shows the results. "
-    "It only reports: it never downloads, installs, or changes any component.\n"
+    "You choose which updates to install: each package is verified, the replaced version is kept for Restore Previous, "
+    "and the change applies after a restart.\n"
     "\n"
     "Update logic ported from foo_component_update_checker by p2ashiura (MIT).\n"
     "(C) 2026 alies-dev\n"
@@ -37,7 +38,7 @@ public:
     void get_name(t_uint32, pfc::string_base& out) override { out = fcu::k_checkCommandName; }
 
     bool get_description(t_uint32, pfc::string_base& out) override {
-        out = "Checks installed third party components for newer versions.";
+        out = "Checks installed third party components for newer versions and installs the updates you choose.";
         return true;
     }
 

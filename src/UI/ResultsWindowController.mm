@@ -7,6 +7,8 @@
 #include "../Integration/Settings.h"
 #include "../upstream/automatic_check.h"
 #include "DebugSnapshot.h"
+#include "../Core/package_layout.h"
+#include "../Platform/fcu_install.h"
 
 namespace {
 
@@ -38,18 +40,21 @@ NSString *statusText(UpdateStatus s) {
 
 @interface FCUResultRow : NSObject
 @property (copy) NSString *component, *installed, *latest, *status, *source, *tooltip, *releaseUrl;
+@property (copy) NSString *name, *blockReason, *backupVersion; // file name, why not installable ("" when it is), backup version ("" when none)
 @property UpdateStatus statusCode;
+@property BOOL staged, failed;
 @end
 @implementation FCUResultRow
 @end
 
-@interface FCUResultsWindowController : NSWindowController <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
+@interface FCUResultsWindowController : NSWindowController <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate>
 @property (nonatomic) int64_t checkId; // the check this window runs or waits for (CurrentUpdateCheckId)
 @property (nonatomic) BOOL checking;
 - (instancetype)initWithEmptyMessage:(NSString *)message;
 - (void)runCheck;
 - (void)showResults:(std::vector<CheckResult> const &)results;
 - (BOOL)isAttached;
+- (void)operationFinished:(NSString *)summary failures:(NSDictionary<NSString *, NSString *> *)failures;
 - (void)finishCheckWithResults:(std::vector<CheckResult> const &)results;
 #ifdef FCU_DEBUG_HOOKS
 - (size_t)realiseAllCells;
@@ -57,6 +62,8 @@ NSString *statusText(UpdateStatus s) {
 - (NSString *)debugLayout;
 - (NSString *)debugStatus;
 - (void)debugToggleBuiltIn;
+- (void)debugCheckFirstInstallable;
+- (NSMenuItem *)debugRestoreItemForName:(NSString *)name;
 #endif
 @end
 
@@ -78,11 +85,48 @@ bool keepsWindowState() {
 // The check whose window the user closed while it was still running: its completion must
 // not open a window again (automatic checks open one when an update is found).
 int64_t g_dismissedCheckId = 0;
+
+bool g_installing = false; // an install or restore runs; it holds the update check slot
+
+struct Operation {
+    std::string name, installedVersion, url; // url empty: restore the backup
+};
+
+// Main thread, once the worker is done. The window (if any is open) shows the outcome;
+// anything staged is offered a restart whether or not a window is still there.
+void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::InstallOutcome> const& outcomes) {
+    EndUpdateCheck();
+    g_installing = false;
+    if (fb2k::mainAborter().is_aborting()) return;
+
+    NSMutableDictionary<NSString *, NSString *> *failures = [NSMutableDictionary dictionary];
+    NSMutableArray<NSString *> *failed = [NSMutableArray array];
+    int staged = 0;
+    for (size_t i = 0; i < jobs.size(); ++i) {
+        if (outcomes[i].ok) { ++staged; continue; }
+        failures[ns(jobs[i].name)] = ns(outcomes[i].message);
+        [failed addObject:[NSString stringWithFormat:@"%@: %@", ns(jobs[i].name), ns(outcomes[i].message)]];
+    }
+    NSString *summary = staged ? [NSString stringWithFormat:@"Staged %d of %zu. Restart foobar2000 to finish.", staged, jobs.size()] : @"Nothing was installed.";
+    if (failed.count) summary = [summary stringByAppendingFormat:@" Failed: %@", [failed componentsJoinedByString:@"; "]];
+    [g_controller operationFinished:summary failures:failures];
+
+    if (staged == 0) return;
+    NSAlert *alert = [NSAlert new];
+    alert.messageText = @"Restart foobar2000 now to finish installing?";
+    alert.informativeText = @"The new versions are applied when foobar2000 starts.";
+    [alert addButtonWithTitle:@"Restart Now"];
+    [alert addButtonWithTitle:@"Later"];
+    if ([alert runModal] == NSAlertFirstButtonReturn) standard_commands::main_restart();
+}
 }
 
 @implementation FCUResultsWindowController {
     NSTableView *_table;
     NSTextField *_statusLine;
+    NSButton *_install;
+    NSMutableSet<NSString *> *_checked;                          // names of the rows ticked for install
+    NSMutableDictionary<NSString *, NSString *> *_failures;      // last install error per component
     NSButton *_checkAgain, *_showBuiltIn;
     std::vector<CheckResult> _results;
     NSArray<FCUResultRow *> *_rows;
@@ -100,6 +144,8 @@ int64_t g_dismissedCheckId = 0;
     if ((self = [super initWithWindow:window])) {
         _emptyMessage = [message copy];
         _rows = @[];
+        _checked = [NSMutableSet set];
+        _failures = [NSMutableDictionary dictionary];
         window.delegate = self;
         // Saved size and position win over the default; set before the first show.
         BOOL restored = keepsWindowState() && [window setFrameUsingName:@"FCUResultsWindow"];
@@ -143,6 +189,10 @@ int64_t g_dismissedCheckId = 0;
     _table.target = self;
     _table.doubleAction = @selector(openReleasePage:);
     _table.usesAlternatingRowBackgroundColors = YES;
+    NSMenu *menu = [[NSMenu alloc] init];
+    menu.autoenablesItems = NO;
+    menu.delegate = self;
+    _table.menu = menu;
     scroll.documentView = _table;
     [content addSubview:scroll];
     // Fit the columns to the visible width now (the window may never be shown before it is drawn).
@@ -150,7 +200,7 @@ int64_t g_dismissedCheckId = 0;
     [_table sizeToFit];
 
     _statusLine = [NSTextField labelWithString:@""];
-    _statusLine.frame = NSMakeRect(230, 14, bounds.size.width - 464, 18);
+    _statusLine.frame = NSMakeRect(230, 14, bounds.size.width - 556, 18);
     _statusLine.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     _statusLine.lineBreakMode = NSLineBreakByTruncatingTail;
     [content addSubview:_statusLine];
@@ -159,6 +209,12 @@ int64_t g_dismissedCheckId = 0;
     _checkAgain.frame = NSMakeRect(bounds.size.width - 224, 8, 110, 28);
     _checkAgain.autoresizingMask = NSViewMinXMargin | NSViewMaxYMargin;
     [content addSubview:_checkAgain];
+
+    _install = [NSButton buttonWithTitle:@"Install" target:self action:@selector(installChecked:)];
+    _install.frame = NSMakeRect(bounds.size.width - 322, 8, 90, 28);
+    _install.autoresizingMask = NSViewMinXMargin | NSViewMaxYMargin;
+    _install.toolTip = @"Install the ticked updates";
+    [content addSubview:_install];
 
     _showBuiltIn = [NSButton checkboxWithTitle:@"Show built in components" target:self action:@selector(showBuiltInChanged:)];
     _showBuiltIn.frame = NSMakeRect(16, 10, 200, 20);
@@ -175,9 +231,14 @@ int64_t g_dismissedCheckId = 0;
 
 - (void)setStatus:(NSString *)text {
     _statusLine.stringValue = text;
+    _statusLine.toolTip = text;
 }
 
 - (void)runCheck {
+    if (g_installing) {
+        [self setStatus:@"An install is running. Check again when it has finished."];
+        return;
+    }
     // One check at a time for the whole process (the automatic check shares the flag).
     if (!TryBeginUpdateCheck()) {
         // Attach to the check that is running, manual or automatic: DeliverCheckResults hands
@@ -185,13 +246,13 @@ int64_t g_dismissedCheckId = 0;
         _attached = YES;
         self.checkId = CurrentUpdateCheckId();
         self.checking = YES;
-        _checkAgain.enabled = NO;
+        [self updateControls];
         [self setStatus:@"A check is already running in the background. Its results will appear here when it finishes."];
         return;
     }
     _attached = NO;
     self.checking = YES;
-    _checkAgain.enabled = NO;
+    [self updateControls];
     [self setStatus:@"Starting..."];
     const int64_t checkId = self.checkId = CurrentUpdateCheckId();
     // Enumerated here, on the main thread, once this window owns the check slot.
@@ -228,8 +289,9 @@ int64_t g_dismissedCheckId = 0;
 }
 
 - (void)showResults:(std::vector<CheckResult> const &)results {
-    _checkAgain.enabled = !self.checking;
     _results = results;
+    [_checked removeAllObjects];
+    [_failures removeAllObjects];
     [self rebuildRows];
 }
 
@@ -266,6 +328,18 @@ int64_t g_dismissedCheckId = 0;
         row.tooltip = r->status != UpdateStatus::Error ? ns(r->note)
             : r->note.empty() ? ns(r->errorMessage) : [NSString stringWithFormat:@"%@\n%@", ns(r->errorMessage), ns(r->note)];
         row.releaseUrl = [ns(r->releaseUrl) hasPrefix:@"https://"] ? ns(r->releaseUrl) : @"";
+        row.name = ns(r->dllName);
+        row.staged = fcu::isStaged(r->dllName);
+        row.blockReason = ns(fcu::installBlockReason(r->status == UpdateStatus::UpdateAvailable, r->dllName, r->downloadUrl, r->assetName, row.staged));
+        std::string backup;
+        row.backupVersion = r->dllName != "Core" && fcu::backupVersion(r->dllName, backup) ? ns(backup) : @"";
+        if (row.staged) {
+            row.status = @"Restart to finish";
+        } else if (NSString *why = _failures[row.name]) {
+            row.status = @"Install failed";
+            row.tooltip = why;
+            row.failed = YES;
+        }
         if (r->status == UpdateStatus::UpdateAvailable) ++updates;
         if (r->status == UpdateStatus::Error) {
             ++errors;
@@ -275,9 +349,10 @@ int64_t g_dismissedCheckId = 0;
     }
     _rows = rows;
     [_table reloadData];
+    [self updateControls];
 
-    // While a check runs the status line shows its progress; toggling the checkbox only rebuilds the rows.
-    if (self.checking) return;
+    // While a check or an install runs the status line shows its progress; toggling the checkbox only rebuilds the rows.
+    if (self.checking || g_installing) return;
 
     if (results.empty()) {
         [self setStatus:_emptyMessage];
@@ -290,6 +365,78 @@ int64_t g_dismissedCheckId = 0;
 
 - (void)checkAgain:(id)sender {
     [self runCheck];
+}
+
+- (void)updateControls {
+    bool idle = !self.checking && !g_installing;
+    _checkAgain.enabled = idle;
+    _install.enabled = idle && _checked.count > 0;
+}
+
+- (void)toggleUpdate:(NSButton *)sender {
+    NSInteger index = [_table rowForView:sender];
+    if (index < 0 || index >= (NSInteger)_rows.count) return;
+    FCUResultRow *row = _rows[index];
+    if (sender.state == NSControlStateValueOn) [_checked addObject:row.name]; else [_checked removeObject:row.name];
+    [self updateControls];
+}
+
+- (void)installChecked:(id)sender {
+    std::vector<Operation> jobs;
+    for (CheckResult const &r : _results) {
+        if ([_checked containsObject:ns(r.dllName)]) jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl});
+    }
+    [self runOperations:jobs];
+}
+
+- (void)restorePrevious:(NSMenuItem *)item {
+    FCUResultRow *row = item.representedObject;
+    [self runOperations:{{row.name.UTF8String, row.installed.UTF8String, ""}}];
+}
+
+// Takes the update check slot, so a check and an install never run together.
+- (void)runOperations:(std::vector<Operation> const &)jobs {
+    if (jobs.empty() || !TryBeginUpdateCheck()) return;
+    g_installing = true;
+    [self updateControls];
+    fb2k::splitTask([jobs] {
+        abort_callback &abort = fb2k::mainAborter();
+        std::vector<fcu::InstallOutcome> outcomes;
+        for (size_t i = 0; i < jobs.size() && !abort.is_aborting(); ++i) {
+            Operation const &op = jobs[i];
+            fb2k::inMainThread([name = op.name, i, count = jobs.size(), restoring = op.url.empty()] {
+                if (!g_controller || fb2k::mainAborter().is_aborting()) return;
+                [g_controller setStatus:[NSString stringWithFormat:@"%@ %@ (%zu of %zu)...", restoring ? @"Restoring" : @"Installing", ns(name), i + 1, count]];
+            });
+            outcomes.push_back(op.url.empty() ? fcu::restorePrevious(op.name, op.installedVersion, abort)
+                                              : fcu::installUpdate(op.name, op.installedVersion, op.url, abort));
+        }
+        outcomes.resize(jobs.size());
+        fb2k::inMainThread([jobs, outcomes] { finishOperation(jobs, outcomes); });
+    });
+}
+
+- (void)operationFinished:(NSString *)summary failures:(NSDictionary<NSString *, NSString *> *)failures {
+    [_checked removeAllObjects];
+    _failures = [failures mutableCopy];
+    [self rebuildRows];
+    [self setStatus:summary];
+}
+
+- (NSMenuItem *)restoreItemForRow:(FCUResultRow *)row {
+    BOOL hasBackup = row.backupVersion.length > 0;
+    NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:hasBackup ? [NSString stringWithFormat:@"Restore Previous (%@)", row.backupVersion] : @"Restore Previous"
+                                                  action:@selector(restorePrevious:) keyEquivalent:@""];
+    item.target = self;
+    item.representedObject = row;
+    item.enabled = hasBackup && !row.staged && !self.checking && !g_installing;
+    return item;
+}
+
+- (void)menuNeedsUpdate:(NSMenu *)menu {
+    [menu removeAllItems];
+    NSInteger index = _table.clickedRow;
+    [menu addItem:[self restoreItemForRow:index >= 0 && index < (NSInteger)_rows.count ? _rows[index] : nil]];
 }
 
 - (void)openReleasePage:(id)sender {
@@ -313,6 +460,23 @@ int64_t g_dismissedCheckId = 0;
 - (void)debugToggleBuiltIn {
     _showBuiltIn.state = _showBuiltIn.state == NSControlStateValueOn ? NSControlStateValueOff : NSControlStateValueOn;
     [self showBuiltInChanged:_showBuiltIn];
+}
+
+- (NSMenuItem *)debugRestoreItemForName:(NSString *)name {
+    for (FCUResultRow *row in _rows) {
+        if ([row.name isEqualToString:name]) return [self restoreItemForRow:row];
+    }
+    return nil;
+}
+
+- (void)debugCheckFirstInstallable {
+    for (FCUResultRow *row in _rows) {
+        if (row.blockReason.length != 0) continue;
+        [_checked addObject:row.name];
+        [_table reloadData];
+        [self updateControls];
+        return;
+    }
 }
 
 - (NSString *)debugLayout {
@@ -351,14 +515,15 @@ int64_t g_dismissedCheckId = 0;
     NSString *ident = column.identifier;
 
     if ([ident isEqualToString:@"update"]) {
-        // Install arrives in M2; the checkbox is present but disabled until then.
         NSButton *box = [tableView makeViewWithIdentifier:ident owner:self];
         if (!box) {
-            box = [NSButton checkboxWithTitle:@"" target:nil action:nil];
+            box = [NSButton checkboxWithTitle:@"" target:self action:@selector(toggleUpdate:)];
             box.identifier = ident;
         }
-        box.enabled = NO;
-        box.state = NSControlStateValueOff;
+        BOOL installable = row.blockReason.length == 0;
+        box.enabled = installable;
+        box.state = installable && [_checked containsObject:row.name] ? NSControlStateValueOn : NSControlStateValueOff;
+        box.toolTip = row.blockReason.length ? row.blockReason : @"Install this update";
         return box;
     }
 
@@ -369,7 +534,7 @@ int64_t g_dismissedCheckId = 0;
         field.lineBreakMode = NSLineBreakByTruncatingTail;
     }
     field.toolTip = row.tooltip;
-    field.textColor = row.statusCode == UpdateStatus::Error && [ident isEqualToString:@"status"] ? NSColor.systemRedColor : NSColor.labelColor;
+    field.textColor = (row.statusCode == UpdateStatus::Error || row.failed) && [ident isEqualToString:@"status"] ? NSColor.systemRedColor : NSColor.labelColor;
     field.font = [ident isEqualToString:@"status"] && row.statusCode == UpdateStatus::UpdateAvailable
         ? [NSFont boldSystemFontOfSize:NSFont.systemFontSize] : [NSFont systemFontOfSize:NSFont.systemFontSize];
 
@@ -446,11 +611,20 @@ void DebugToggleBuiltIn() {
     if (g_controller) [g_controller debugToggleBuiltIn];
 }
 
+std::string DebugRestoreMenuItem(std::vector<CheckResult> const& results, std::string const& name, bool* enabled) {
+    FCUResultsWindowController *controller = [[FCUResultsWindowController alloc] initWithEmptyMessage:@""];
+    [controller showResults:results];
+    NSMenuItem *item = [controller debugRestoreItemForName:ns(name)];
+    if (enabled) *enabled = item.enabled;
+    return item ? item.title.UTF8String : "";
+}
+
 long DebugSnapshotResultsWindow(std::vector<CheckResult> const& results, bool showBuiltIn, const char* pngPath) {
     bool saved = GetShowBuiltInComponents();
     SetShowBuiltInComponents(showBuiltIn);
     FCUResultsWindowController *controller = [[FCUResultsWindowController alloc] initWithEmptyMessage:@""];
     [controller showResults:results];
+    [controller debugCheckFirstInstallable];
     [controller realiseAllCells];
     bool ok = DebugWriteSnapshot(controller.window.contentView, NSAppearanceNameAqua, [NSString stringWithUTF8String:pngPath]);
     SetShowBuiltInComponents(saved);

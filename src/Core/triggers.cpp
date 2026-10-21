@@ -2,10 +2,6 @@
 
 namespace fcu {
 
-bool isCoreUpdateMenuTitle(std::string const& title) {
-    return title == "Check For New Versions" || title == "Check for new foobar2000 versions";
-}
-
 bool isAutomaticCheckDue(bool enabled, int64_t lastCheck, int intervalDays, int64_t now) {
     if (!enabled) return false;
     if (lastCheck <= 0) return true;

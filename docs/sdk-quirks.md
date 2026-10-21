@@ -16,6 +16,15 @@ Facts measured while building this component, with foobar2000 2.26 and `SDK-2026
 * A kill at any point of the apply step is finished by the next start.
 * foobar2000 writes the binary without the execute bit and it still loads.
 
+## Restart and install (used from 0.2.0)
+
+* `standard_commands::main_restart()` relaunches foobar2000 on Mac: the process ends, a new one (new pid) starts by itself and applies `pending/` before the components load. The call does not come back to its caller. Values written to `fb2k::configStore` just before it are kept. Measured with foobar2000 2.26.
+* The install is one `rename()` of `<profile>/foo_component_updater_mac/work/<random>/stage/<name>` to `pending/<name>` (same volume), after the verified bundle was prepared there, so foobar2000 never sees a half written `pending/<name>`.
+* `SecStaticCodeCheckValidity` with `kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode` accepts the foo_abx 2.2.3 package (Developer ID, Team ID 9UF72C5LAW, an extra `Contents/CodeResources` file) and ad hoc signed bundles, and rejects a bundle whose binary was changed after signing.
+* `ditto -x -k` restores symlink entries of a zip made by `zip -y` or `ditto -c -k` as real links, including links that point outside the bundle (`/etc`), so the link walk after extraction is a live check. With a zip whose later entry lies below a link entry, ditto stopped with "Not a directory" and wrote nothing outside the target folder.
+* The Team ID field of a signature proves nothing by itself: an ad hoc signature can carry any string there (the code directory's `teamOffset` is not covered by any certificate), and it passes `codesign --verify --strict`. The Team ID rule therefore uses the requirement `anchor apple generic and certificate leaf[subject.OU] = "<team>"`, which an ad hoc signature cannot satisfy. The batch builds such a forged package.
+* A Restore Previous of an ad hoc backup over a Developer ID bundle is refused by the Team ID rule; the batch builds both versions with the same kind of signature.
+
 ## Signing and quarantine
 
 * Ad hoc signed bundles load, because foobar2000 has `com.apple.security.cs.disable-library-validation`. Unsigned bundles do not load.
@@ -35,11 +44,6 @@ Facts measured while building this component, with foobar2000 2.26 and `SDK-2026
 * GitHub rate limit answers are `403` or `429` with `x-ratelimit-remaining: 0` and `x-ratelimit-reset`, or with `Retry-After`. A `403` without those headers is a plain error.
 * The official catalog answers an unknown component with HTTP 200 and the text "No such component.", not a 404. The parser treats both as "not in the catalog".
 * sourceforge.net answers a Cloudflare challenge to unusual clients (`403`); the upstream parser is unchanged and an unreachable feed shows as an Error row.
-
-## Core update menu items
-
-* foobar2000 has no SDK hook for its own update check, so this component cannot run "with" it through a service. It observes `NSMenuDidSendActionNotification` (object nil, main queue) and starts its check when the sent item's `title` is exactly `Check For New Versions` (app menu) or `Check for new foobar2000 versions` (Help menu). Both titles were verified in foobar2000 2.26.
-* Failure mode: if foobar2000 renames either item the trigger stops firing without any error. Our own Help menu command and the Check Now button are not affected. The match is a pure function (`fcu::isCoreUpdateMenuTitle`) with unit tests.
 
 ## Configuration
 
@@ -78,7 +82,7 @@ All files:
 * The result window call is `DeliverCheckResults(checkId, results, message, openIfClosed)`, called for every automatic check. Manual and automatic checks share one delivery path keyed by `CurrentUpdateCheckId()`: the window attached to that check receives the results, a window closed during an automatic check does not get recreated by it, and the notification level only decides whether a closed window opens.
 * The check lambda has a `try` / `catch (std::exception const&)` so nothing escapes into foobar2000.
 * The due test is `fcu::isAutomaticCheckDue` (pure, unit tested) and the check body is `EvaluateAutomaticCheck()`, called on the main thread by the startup delay and by the 6 hour timer in `Integration/PeriodicCheck.mm`. It refuses to start while a check runs (`TryBeginUpdateCheck`) or the results window is open, and writes the last run time when the check starts instead of when it ends.
-* Upstream records the last run only for automatic checks. Here every completed check (manual, Help menu, foobar2000's own "Check For New Versions" trigger, automatic) records it through `MarkCheckCompletedNow()`, and the interval of the automatic check counts from it. The automatic check still also writes it when it starts.
+* Upstream records the last run only for automatic checks. Here every completed check (manual from the Help menu or the window, automatic) records it through `MarkCheckCompletedNow()`, and the interval of the automatic check counts from it. The automatic check still also writes it when it starts.
 * `automatic_check.h` and `.cpp` gain `GetAutomaticCheckLastRun()`, a read only accessor for the persisted last run time (shown on the preferences page).
 * Debug builds only: `on_init` schedules nothing while the autotest config key is set (the saved preference is not touched).
 

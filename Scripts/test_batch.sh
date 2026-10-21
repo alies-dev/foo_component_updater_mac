@@ -5,6 +5,7 @@
 # Usage:
 #   ./Scripts/test_batch.sh m1          all runs
 #   ./Scripts/test_batch.sh m1 real     only the real GitHub run (to compare request counts)
+#   ./Scripts/test_batch.sh m2          install, Restore Previous and restart, in the real foobar2000
 #
 # M1 runs six headless starts of foobar2000 against the Debug build, driven by the
 # foo_component_updater_mac.debug.autotest hook (no UI, no keystrokes, no clicks):
@@ -13,7 +14,13 @@
 #   down       stub not listening: network errors, no crash
 #   ratelimit  stub answers 403 with x-ratelimit headers: message, no further API calls
 #   badregistry registry entries that must never reach a URL
-#   triggers   synthetic "Check For New Versions" menu notifications and the periodic evaluation (counted checks)
+#   triggers   Help > Check for Component Updates... and the periodic evaluation (counted checks), and that foobar2000's own update menu titles start none
+#
+# M2 runs four starts of foobar2000 (the first three chained by main_restart() calls of the component itself):
+#   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
+#   m2-restore   the new version runs (Components list, mapped binary); Restore Previous stages the backup; restart
+#   m2-refuse    the old version runs again, the backup holds the new one; nine bad packages are refused
+#   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
 # (verified with diff -rq); foobar2000 is started only with `open -g -a foobar2000`,
@@ -27,8 +34,8 @@ set -uo pipefail
 
 BATCH="${1:-}"
 ONLY="${2:-}"
-if [ "$BATCH" != "m1" ]; then
-    echo "Usage: $0 m1" >&2
+if [ "$BATCH" != "m1" ] && [ "$BATCH" != "m2" ]; then
+    echo "Usage: $0 m1|m2" >&2
     exit 2
 fi
 
@@ -72,6 +79,12 @@ quit_fb2k() {
         sleep 0.5
     done
     return 1
+}
+
+# Every quit that matters: when foobar2000 does not go away nothing else may touch the profile. The exit runs the
+# cleanup, which sees the same failure, keeps the backup and does not restore over a running application.
+quit_or_stop() {
+    quit_fb2k || { fail "$1: foobar2000 did not quit; stopping before anything else changes the profile"; exit 3; }
 }
 
 stop_stub() {
@@ -157,13 +170,13 @@ start_run() {
     done
     if [ ! -s "$log" ]; then
         fail "$name: no autotest log after 120 s"
-        quit_fb2k
+        quit_or_stop "$name"
         return 1
     fi
     local pid; pid="$(fb2k_pid)"
     section "Run $name: loaded images and log"
     lsof -p "$pid" 2>/dev/null | grep -E 'foo_component_updater_mac' | awk '{print $NF}' | sort -u | fence
-    quit_fb2k || fail "$name: foobar2000 did not quit"
+    quit_or_stop "$name"
     cp "$log" "$WORK/run-$name.json"
     fence < "$log"
 }
@@ -185,7 +198,7 @@ start_stub() {
     local mode="$1" port="$2" log="$3"
     : > "$log"
     python3 "$SCRIPT_DIR/test_stub.py" --port "$port" --cert "$WORK/cert.pem" --key "$WORK/key.pem" \
-        --fixtures "$FIXTURES" --log "$log" --mode "$mode" --delay "${STUB_DELAY:-0}" &
+        --fixtures "$FIXTURES" --log "$log" --mode "$mode" --delay "${STUB_DELAY:-0}" ${PKG_DIR:+--packages "$PKG_DIR"} &
     STUB_PID=$!
     for _ in $(seq 1 40); do
         curl -sk -o /dev/null "https://127.0.0.1:$port/" && return 0
@@ -244,6 +257,7 @@ openssl req -x509 -newkey rsa:2048 -keyout "$WORK/key.pem" -out "$WORK/cert.pem"
 cfg_delete_string foo_component_updater_mac.debug.api_base
 
 # ---- run 1: real GitHub, one positive check -------------------------------------------------
+if [ "$BATCH" = m1 ]; then
 section "Run real: real GitHub API"
 if ! curl -sf -o /dev/null https://api.github.com/rate_limit; then
     fail "real: api.github.com not reachable"
@@ -255,6 +269,7 @@ else
 fi
 
 if [ "$ONLY" = real ]; then exit 0; fi
+fi
 
 # ---- stage an older foo_abx (the catalog has one macOS build, 2.2.3; its version string is patched to 2.2.1) ----
 section "Stage an older foo_abx"
@@ -290,6 +305,151 @@ run_against_stub() {
     stop_stub
 }
 
+sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+
+# Packages for the stub: good is the catalog's foo_abx re-signed ad hoc like the installed one (a restore of an ad hoc
+# backup over a Developer ID bundle is refused by design), devid the original, forgedteam an ad hoc one whose code directory
+# claims the Team ID of devid, the rest are broken in one way each.
+m2_packages() {
+    local pk="$WORK/pkgs"
+    mkdir -p "$pk"
+    unzip -q "$WORK/foo_abx.zip" 'mac/*' -d "$WORK/orig" || return 1
+    cp "$WORK/foo_abx.zip" "$pk/devid.fb2k-component"
+    ditto "$WORK/orig" "$WORK/good" && codesign --force --sign - "$WORK/good/mac/foo_abx.component" >/dev/null 2>&1 || return 1
+    ditto "$WORK/good" "$WORK/tampered" && ditto "$WORK/good" "$WORK/wrongid" || return 1
+    python3 - "$WORK/tampered/mac/foo_abx.component/Contents/MacOS/foo_abx" <<'PY'
+import sys
+d = open(sys.argv[1], "rb").read()
+open(sys.argv[1], "wb").write(d.replace(b"2.2.3\x00", b"2.2.9\x00"))
+PY
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.other" "$WORK/wrongid/mac/foo_abx.component/Contents/Info.plist"
+    codesign --force --sign - "$WORK/wrongid/mac/foo_abx.component" >/dev/null 2>&1 || return 1
+    ditto "$WORK/good" "$WORK/linkout" && ln -s /etc "$WORK/linkout/mac/foo_abx.component/Contents/Resources/outside" || return 1
+    ditto "$WORK/orig" "$WORK/forgedteam" && codesign --force --sign - --identifier com.foobar2000.foo-abxXXXXXXXXXXX "$WORK/forgedteam/mac/foo_abx.component" >/dev/null 2>&1 || return 1
+    # Pad the identifier by 11 bytes, then overwrite the padding with the NUL and "9UF72C5LAW\0" (teamOffset) so nothing else moves.
+    python3 - "$WORK/forgedteam/mac/foo_abx.component/Contents/MacOS/foo_abx" <<'PY'
+import struct, sys
+d = bytearray(open(sys.argv[1], "rb").read())
+i = d.find(b"\xfa\xde\x0c\x02")
+while i >= 0:
+    ident, = struct.unpack(">I", d[i + 20:i + 24])
+    assert d[i + ident:i + ident + 34] == b"com.foobar2000.foo-abx" + b"X" * 11 + b"\0"
+    d[i + ident + 22:i + ident + 34] = b"\0" + b"9UF72C5LAW\0"
+    d[i + 48:i + 52] = struct.pack(">I", ident + 23)
+    i = d.find(b"\xfa\xde\x0c\x02", i + 1)
+open(sys.argv[1], "wb").write(d)
+PY
+    [ "$(codesign -dv "$WORK/forgedteam/mac/foo_abx.component" 2>&1 | grep -c 'TeamIdentifier=9UF72C5LAW')" = 1 ] && codesign --verify --strict --deep "$WORK/forgedteam/mac/foo_abx.component" || return 1
+    for n in good tampered wrongid linkout forgedteam; do (cd "$WORK/$n" && zip -qry "$pk/$n.fb2k-component" mac) || return 1; done
+    (cd "$WORK/good/mac" && zip -qry "$pk/nomac.fb2k-component" foo_abx.component) || return 1
+    python3 - "$pk/good.fb2k-component" "$pk/zipslip.fb2k-component" <<'PY'
+import shutil, sys, zipfile
+shutil.copy(sys.argv[1], sys.argv[2])
+with zipfile.ZipFile(sys.argv[2], "a") as z:
+    z.writestr("../../zipslip.txt", "x")
+PY
+    echo "not a zip" > "$pk/notzip.fb2k-component"
+    # Two zips with a local entry that the central directory does not list (ditto would extract it, the layout check never saw it):
+    # hiddenentry as it is, unreadable below a listed folder with mode 0200 (ditto applies it), so nothing under it can be examined.
+    python3 - "$pk/good.fb2k-component" "$pk/hiddenentry.fb2k-component" "$pk/unreadable.fb2k-component" <<'PY'
+import struct, sys, zlib
+z = open(sys.argv[1], "rb").read()
+eocd = z.rfind(b"PK\x05\x06")
+count, size, cd_off = struct.unpack("<HII", z[eocd + 10:eocd + 20])
+local_fmt = "<IHHHHHIIIHH"
+name, data = b"extra/hidden.bin", b"hidden"
+hidden = struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, zlib.crc32(data), len(data), len(data), len(name), 0) + name + data
+open(sys.argv[2], "wb").write(z[:cd_off] + hidden + z[cd_off:eocd + 16] + struct.pack("<I", cd_off + len(hidden)) + z[eocd + 20:])
+folder = b"extra/"
+local = struct.pack(local_fmt, 0x04034b50, 20, 0, 0, 0, 0x21, 0, 0, 0, len(folder), 0) + folder + hidden
+record = struct.pack("<I6H3I5H2I", 0x02014b50, 0x031e, 20, 0, 0, 0, 0x21, 0, 0, 0, len(folder), 0, 0, 0, 0, (0o40200 << 16) | 0x10, cd_off) + folder
+tail = struct.pack("<HHII", count + 1, count + 1, size + len(record), cd_off + len(local))
+open(sys.argv[3], "wb").write(z[:cd_off] + local + z[cd_off:eocd] + record + z[eocd:eocd + 8] + tail + z[eocd + 20:])
+PY
+}
+
+# m2_start <scenario>: starts foobar2000 on a scenario of the autotest hook and waits for its log.
+m2_start() {
+    [ -z "$(fb2k_pid)" ] || { fail "m2 $1: foobar2000 is already running and was not started by this batch; it is left alone"; exit 3; }
+    cfg_set_string foo_component_updater_mac.debug.m2 "$1"
+    cfg_set_string foo_component_updater_mac.debug.autotest "$WORK/autotest-m2-$1.json"
+    open -g -a foobar2000
+    for _ in $(seq 1 40); do BATCH_PID="$(fb2k_pid)"; [ -n "$BATCH_PID" ] && break; sleep 0.25; done
+    m2_wait "$1"
+}
+
+# m2_wait <scenario>: waits for the log of the scenario; the process that wrote it is the one to quit (a restart changes the pid).
+m2_wait() {
+    local log="$WORK/autotest-m2-$1.json"
+    for _ in $(seq 1 240); do [ -s "$log" ] && break; sleep 0.5; done
+    if [ ! -s "$log" ]; then fail "m2 $1: no autotest log after 120 s"; return 1; fi
+    BATCH_PID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["before"]["pid"])' "$log")"
+    section "m2 $1: loaded images and log"
+    lsof -p "$BATCH_PID" 2>/dev/null | grep -E 'foo_abx|foo_component_updater_mac' | awk '{print $(NF-1), $NF}' | sort -u | tee "$WORK/lsof-$1.txt" | fence
+    cp "$log" "$WORK/run-m2-$1.json"
+    fence < "$log"
+}
+
+# m2_disk <scenario> <sha256 of the foo_abx binary expected on disk and mapped, or empty to skip>: the file system after a step.
+m2_disk() {
+    local bin="$PROFILE/user-components/foo_abx/foo_abx.component/Contents/MacOS/foo_abx" inode mapped
+    if [ -n "$2" ]; then
+        inode="$(stat -f %i "$bin")"
+        mapped="$(grep 'foo_abx.component/Contents/MacOS/foo_abx' "$WORK/lsof-$1.txt" | awk '{print $1}' | sort -u | tr '\n' ' ')"
+        if [ "$(sha "$bin")" = "$2" ] && [ "$mapped" = "$inode " ]; then
+            say "PASS m2 $1: the binary on disk is ${2:0:12}... and the process maps that very file (inode $inode)"
+        else
+            fail "m2 $1: binary sha $(sha "$bin") (want $2), mapped inodes '$mapped', file inode $inode"
+        fi
+    fi
+    [ -z "$(ls "$PROFILE/foo_component_updater_mac/work" 2>/dev/null)" ] && say "PASS m2 $1: work folder is empty" || fail "m2 $1: work folder is not empty"
+}
+
+run_m2() {
+    section "m2: packages for the stub"
+    m2_packages && say "PASS packages built: $(ls "$WORK/pkgs" | tr '\n' ' ')" || { fail "building the packages"; exit 1; }
+    local installed="$PROFILE/user-components/foo_abx/foo_abx.component" old_sha good_sha orig_sha port
+    old_sha="$(sha "$installed/Contents/MacOS/foo_abx")"
+    good_sha="$(sha "$WORK/good/mac/foo_abx.component/Contents/MacOS/foo_abx")"
+    orig_sha="$(sha "$WORK/orig/mac/foo_abx.component/Contents/MacOS/foo_abx")"
+    PKG_DIR="$WORK/pkgs"
+    port="$(free_port)"
+    start_stub normal "$port" "$WORK/stub-m2.log" || { fail "stub did not start"; exit 1; }
+    cfg_set_string foo_component_updater_mac.debug.api_base "https://127.0.0.1:$port"
+
+    BATCH_PID=""
+    m2_start install && check_run m2-install
+    local previous="$BATCH_PID"
+    # Restart 1: pending/foo_abx is applied, the process maps the new binary.
+    if m2_wait restore; then
+        check_run m2-restore "$previous"; m2_disk restore "$good_sha"; previous="$BATCH_PID"
+    fi
+    # Restart 2: the backup is back, and the backup holds the newer version.
+    if m2_wait refuse; then
+        check_run m2-refuse "$previous"; m2_disk refuse "$old_sha"
+        [ ! -e "$PROFILE/user-components/pending/foo_abx" ] && say "PASS m2 refuse: nothing pending after nine refused packages" || fail "m2 refuse: pending/foo_abx exists"
+        say "INFO backup.json on disk: $(cat "$PROFILE/foo_component_updater_mac/backup/foo_abx/backup.json")"
+    fi
+    quit_or_stop m2
+
+    rm -rf "$PROFILE/user-components/foo_abx" && mkdir "$PROFILE/user-components/foo_abx" && cp -R "$WORK/orig/mac/foo_abx.component" "$PROFILE/user-components/foo_abx/"
+    say "INFO foo_abx replaced by the original Developer ID bundle: $(codesign -dv "$installed" 2>&1 | grep TeamIdentifier)"
+    if m2_start team; then
+        check_run m2-team
+        local staged="$PROFILE/user-components/pending/foo_abx/foo_abx.component"
+        if [ "$(sha "$staged/Contents/MacOS/foo_abx")" = "$orig_sha" ] && codesign --verify --strict --deep "$staged" 2>/dev/null \
+            && [ "$(xattr -lr "$staged" | grep -c quarantine)" = 0 ] && [ "$(sha "$installed/Contents/MacOS/foo_abx")" = "$orig_sha" ]; then
+            say "PASS m2 team: the staged bundle is the Developer ID package, verifies, has no quarantine; the installed bundle is untouched"
+        else
+            fail "m2 team: staged bundle is not as expected"
+        fi
+    fi
+    quit_or_stop m2
+    section "m2: requests the stub saw"
+    fence < "$WORK/stub-m2.log"
+}
+
+if [ "$BATCH" = m1 ]; then
 # ---- run 2: stub, settings persisted, catalog source ---------------------------------------
 run_against_stub stub normal
 
@@ -305,10 +465,13 @@ run_against_stub ratelimit ratelimit
 sqlite3 "$CONFIG_DB" "DELETE FROM configInts WHERE name LIKE 'cfg_var.bd0271b2%'; DELETE FROM configStrings WHERE name LIKE 'cfg_var.a308a585%';"
 run_against_stub badregistry badregistry
 
-# ---- run 6: menu trigger and periodic evaluation ----------------------------------------------
+# ---- run 6: manual command, periodic evaluation and the old menu titles ------------------------
 cfg_set_string foo_component_updater_mac.debug.recheck_seconds 2
 STUB_DELAY=0.3 run_against_stub triggers normal
 cfg_delete_string foo_component_updater_mac.debug.recheck_seconds
+else
+run_m2
+fi
 
 section "Crash reports"
 ls "$REPORTS"/foobar2000* > "$WORK/reports-after.txt" 2>/dev/null

@@ -25,14 +25,16 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 ## Features
 
 * A results window with the installed and the latest version of each component, its status and a link to the release notes.
+* Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
-* Checks automatically every few days, and whenever you choose foobar2000's own Check For New Versions.
+* Checks automatically every few days.
 * Custom sources for components it does not know, see [docs/custom-sources.md](docs/custom-sources.md).
 * foobar2000's built in components are hidden unless you ask for them.
 
 ## Privacy and safety
 
-* This version only reports. It never downloads, installs or changes a component.
+* Nothing is downloaded or installed until you tick an update and click Install. Only `.fb2k-component` packages are installed (GitHub `.zip` files are only reported), and only from the source the update was found at.
+* Before anything is replaced the package must have a valid code signature, the same bundle identifier as the installed component and, when the installed one has a Team ID, the same Team ID. The new version waits in foobar2000's `pending` folder and is applied at the next start.
 * HTTPS only. It contacts GitHub (releases and the shared registry), foobar2000.org and the hosts of custom sources you add, and nothing else.
 * No personal data, no telemetry.
 

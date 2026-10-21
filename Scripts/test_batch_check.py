@@ -83,8 +83,8 @@ def jenda_rows(rows):
 
 
 # GitHub release list requests (/repos/.../releases) each run must make: 2 checks' worth is a bug.
-# The checked component and JendaT's suite are one request each; triggers also counts the 5 later
-# checks (menu app title, Help title, periodic, attach, manual reopen, dismiss, concurrent) of the scenario.
+# The checked component and JendaT's suite are one request each; triggers also counts the 7 later
+# checks (the command twice, the command with the window open, periodic, attach, manual reopen, dismiss, concurrent) of the scenario.
 EXPECTED_GITHUB_REQUESTS = {"real": 2, "stub": 2, "down": 2, "ratelimit": 1, "badregistry": 2, "triggers": 16}
 
 
@@ -97,10 +97,52 @@ def github_requests(log, stub_log, run):
     return len([p for p in stub_paths(stub_log) if p.startswith("/repos/")])
 
 
+def refused(log, name, text):
+    o = log["outcomes"].get(name, {})
+    check(f"{name}: refused with a message about \"{text}\"", o.get("ok") is False and text in o.get("message", ""), o)
+
+
+def m2(run, log, previous_pid):
+    before, after, o = log["before"], log["after"], log["outcomes"]
+    if previous_pid:
+        check("a new foobar2000 process started (the restart)", before["pid"] != int(previous_pid[0]), before)
+    if run == "m2-install":
+        row = log["row"]
+        check("foo_abx shows an update from 2.2.1 to 2.2.3 and is installable",
+              (row["status"], row["installed"], row["latest"], row["block_reason"]) == ("update_available", "2.2.1", "2.2.3", ""), row)
+        check("start state: 2.2.1 installed, nothing staged, no backup", (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.1", False, ""), before)
+        check("install staged the new version and kept 2.2.1 as the backup",
+              o["install"]["ok"] is True and after["staged"] is True and after["backup_version"] == "2.2.1" and after["installed_version"] == "2.2.1", log)
+    elif run == "m2-restore":
+        check("after the restart the Components list shows 2.2.3, nothing pending, the backup is 2.2.1",
+              (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.3", False, "2.2.1"), before)
+        check("Restore Previous staged the backup and the backup now holds 2.2.3",
+              o["restore"]["ok"] is True and after["staged"] is True and after["backup_version"] == "2.2.3", log)
+    elif run == "m2-refuse":
+        check("after the restart the Components list shows 2.2.1 again and the backup holds 2.2.3",
+              (before["installed_version"], before["staged"], before["backup_version"]) == ("2.2.1", False, "2.2.3"), before)
+        for name, text in (("tampered", "code signature"), ("wrongid", "bundle identifier"), ("zipslip", "unsafe path"), ("nomac", "no macOS build"),
+                           ("notzip", "not a valid package"), ("missing", "download failed"), ("linkout", "link that points outside"),
+                           ("hiddenentry", "not in its own listing"), ("unreadable", "cannot be examined")):
+            refused(log, name, text)
+        check("nothing staged, installed version and backup unchanged",
+              (after["staged"], after["installed_version"], after["backup_version"]) == (False, "2.2.1", "2.2.3"), after)
+        menu = log["restore_menu"]
+        check("context menu: Restore Previous (2.2.3) is enabled for foo_abx, disabled without a backup",
+              (menu["title"], menu["enabled"], menu["title_without_backup"], menu["enabled_without_backup"]) == ("Restore Previous (2.2.3)", True, "Restore Previous", False), menu)
+    elif run == "m2-team":
+        refused(log, "other_developer", "different developer")
+        refused(log, "forged_team", "different developer")
+        check("a package from the same Team ID is staged", o["same_developer"]["ok"] is True and after["staged"] is True, log)
+    sys.exit(1 if failures else 0)
+
+
 def main():
     run, path = sys.argv[1], sys.argv[2]
-    stub_log = sys.argv[3] if len(sys.argv) > 3 else None
     log = json.load(open(path))
+    if run.startswith("m2-"):
+        m2(run, log, sys.argv[3:4])
+    stub_log = sys.argv[3] if len(sys.argv) > 3 else None
     rows = rows_by_name(log)
     requests = log["requests"]
     common(log)
@@ -163,11 +205,11 @@ def main():
         check("valid components in the same run are unaffected", rows.get("foo_jl_spectrum", {}).get("status") == "update_available", rows.get("foo_jl_spectrum"))
     elif run == "triggers":
         t = log.get("triggers", {})
-        check("app menu title twice plus an unrelated title: 1 check begun, 2 triggers handled",
-              t.get("menu_app", {}).get("begun_delta") == 1 and t.get("menu_app", {}).get("handled_delta") == 2, t.get("menu_app"))
-        check("a completed manual check (from the foobar2000 menu item) records the last check time",
-              t.get("menu_app", {}).get("last_check_recorded") is True, t.get("menu_app"))
-        check("Help menu title starts exactly 1 check", t.get("menu_help") == {"begun_delta": 1, "handled_delta": 1}, t.get("menu_help"))
+        check("foobar2000's own update menu titles (app and Help menu) start no check and open no window",
+              t.get("old_menu_titles") == {"begun_delta": 0, "window_open": False}, t.get("old_menu_titles"))
+        check("Help > Check for Component Updates... twice in a row: 1 check begun, its completion is recorded as the last check",
+              t.get("manual", {}).get("begun_delta") == 1 and t.get("manual", {}).get("last_check_recorded") is True, t.get("manual"))
+        check("the command with the window already open starts exactly 1 check", t.get("manual_open_window") == {"begun_delta": 1}, t.get("manual_open_window"))
         p = t.get("periodic", {})
         check("periodic evaluation with the interval elapsed starts exactly 1 more check while the timer keeps firing",
               p.get("begun_delta") == 1 and p.get("ticks_delta", 0) >= 2, p)
