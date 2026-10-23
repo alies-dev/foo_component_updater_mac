@@ -424,6 +424,8 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
             self.view.frame.size.width, self.view.frame.size.height];
 }
 
+- (NSString *)debugLastCheckText { return _lastCheck.stringValue; }
+
 - (void)debugExpandAdvanced {
     if (_advanced.hidden) [self toggleAdvanced:nil];
 }

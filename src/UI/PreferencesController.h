@@ -14,6 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 #ifdef FCU_DEBUG_HOOKS
 - (void)debugExpandAdvanced;
+- (NSString *)debugLastCheckText;
 - (NSString *)debugGeometry;
 - (NSInteger)debugTypeInterval:(NSString *)text;
 - (NSInteger)debugTypeThenStep:(NSString *)text direction:(NSInteger)direction;
