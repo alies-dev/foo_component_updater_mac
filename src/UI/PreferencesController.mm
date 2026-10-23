@@ -207,6 +207,14 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
 - (void)viewWillAppear {
     [super viewWillAppear];
     [self refreshLastCheck];
+    // The page stays open while a check finishes: the time it shows would otherwise go stale.
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(refreshLastCheck)
+                                                 name:FCUUpdateCheckCompletedNotification object:nil];
+}
+
+- (void)viewDidDisappear {
+    [super viewDidDisappear];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:FCUUpdateCheckCompletedNotification object:nil];
 }
 
 #pragma mark - Building blocks

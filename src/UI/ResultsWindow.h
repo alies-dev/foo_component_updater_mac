@@ -6,6 +6,12 @@
 #include "../upstream/update_check.h"
 #include "../version.h"
 
+#ifdef __OBJC__
+#import <Foundation/Foundation.h>
+// Posted on the main thread by DeliverCheckResults once the check has ended, so open UI can refresh.
+extern NSNotificationName const FCUUpdateCheckCompletedNotification;
+#endif
+
 // Main thread only.
 
 // Opens the results window (at most one) and starts a check of the installed components.
