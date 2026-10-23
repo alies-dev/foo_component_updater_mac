@@ -61,6 +61,35 @@ export FB2K_SDK_PATH=/path/to/SDK-2026-10-01   # built SDK libraries, not part o
 
 GitHub Actions builds and tests every pull request and every push to `main`. A release is made by pushing a tag `vX.Y.Z` that matches `FCU_VERSION` in `src/version.h`; the matching `CHANGELOG.md` section becomes the release notes, so keep it to a few user visible bullets. More notes are in [docs/sdk-quirks.md](docs/sdk-quirks.md).
 
+## Supported components
+
+The updater knows the GitHub repository of these components, so it finds their updates without the foobar2000.org catalog or the shared registry:
+
+| Component | How |
+| --- | --- |
+| [foo_ui_panels](https://github.com/santiagorod92/foo_ui_panels) | Declared by the component |
+| [foo_navidrome](https://github.com/santiagorod92/foo_navidrome) | Declared by the component |
+| [foo_jl_album_art](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_biography](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_effects_dsp](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_plorg](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_queue_manager](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_scrobble](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_simplaylist](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_spectrum](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_tidal](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_vectorscope](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_jl_wave_seekbar](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
+| [foo_mac_scrobble](https://github.com/avelytchko/foo_mac_scrobble) | Built into the updater |
+| [foo_vis_projectm_mac](https://github.com/Stwarf/foo_vis_projectm_mac) | Built into the updater |
+| [foo_cyan_leaf](https://github.com/CyanLeafcomponent/cyan-leaf-downloads) | Built into the updater |
+| [foo_vis_projectMacOS](https://github.com/gabitoesmiapodo/projectMacOS) | Built into the updater |
+| [foo_richtext_mac](https://github.com/seongbin/foo_richtext_mac) | Built into the updater |
+
+*Declared by the component*: the component's `Info.plist` names its source (`FB2KUpdateSource`, see [docs/component-authors.md](docs/component-authors.md)). *Built into the updater*: the source is listed in [Resources/extra_components.json](Resources/extra_components.json), which ships with the updater.
+
+Other components are found through the foobar2000.org catalog, the shared registry or your custom sources when they are listed there.
+
 ## Credits
 
 The update checking logic comes from [foo_component_update_checker](https://github.com/p2ashiura/foo_component_update_checker) by p2ashiura (MIT) and its shared registry [foo_component_update_checker-registry](https://github.com/p2ashiura/foo_component_update_checker-registry). The build layout follows [JendaT/fb2k-components-mac-suite](https://github.com/JendaT/fb2k-components-mac-suite). JSON parsing by [nlohmann/json](https://github.com/nlohmann/json).
