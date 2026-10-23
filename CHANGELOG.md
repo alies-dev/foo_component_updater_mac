@@ -2,6 +2,16 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-10-23
+
+### Fixed
+
+* The Last check line in Preferences now updates as soon as a check finishes.
+
+### Install
+
+Version 0.2.0 or later: tick this component in the results window, click Install and restart foobar2000. Version 0.1.0: open foobar2000 > Settings... > Components, click **+**, choose `foo_component_updater_mac.fb2k-component` and restart foobar2000.
+
 ## [0.2.1] - 2026-10-22
 
 ### Changed

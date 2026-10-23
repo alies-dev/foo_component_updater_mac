@@ -64,6 +64,9 @@ def common(log):
     check("apply: valid sources saved", log["apply"]["valid_accepted"] and log["apply"]["entries_after_valid"] == 1, log["apply"])
     check("apply: invalid sources rejected, old value kept",
           log["apply"]["invalid_rejected"] and log["apply"]["invalid_message"] and log["apply"]["entries_after_invalid"] == 1, log["apply"])
+    lc = log["last_check_refresh"]
+    check("Last check line refreshes when a check completes while the page is open, and not after it closed",
+          lc["began"] and lc["refreshed_when_visible"] and lc["not_refreshed_when_hidden"], lc)
     check("settings written by the run", log["settings_set"] == {"auto_check": True, "interval_days": 11, "include_prereleases": True, "sources": 1}, log["settings_set"])
 
 

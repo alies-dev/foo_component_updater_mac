@@ -10,6 +10,8 @@
 #include "../Core/package_layout.h"
 #include "../Platform/fcu_install.h"
 
+NSNotificationName const FCUUpdateCheckCompletedNotification = @"FCUUpdateCheckCompleted";
+
 namespace {
 
 NSString *ns(std::string const& s) { return [NSString stringWithUTF8String:s.c_str()] ?: @""; }
@@ -636,7 +638,12 @@ long DebugSnapshotResultsWindow(std::vector<CheckResult> const& results, bool sh
 void DeliverCheckResults(int64_t checkId, std::vector<CheckResult> const& results, const char* emptyMessage, bool openIfClosed) {
     // Delivery ends the check (exactly once, on the main thread): until now no other check
     // could begin, so a later check can never replace the dismissal marker of this one.
-    struct Release { ~Release() { EndUpdateCheck(); } } release;
+    struct Release {
+        ~Release() {
+            EndUpdateCheck();
+            [[NSNotificationCenter defaultCenter] postNotificationName:FCUUpdateCheckCompletedNotification object:nil];
+        }
+    } release;
 
     if (g_controller) {
         // The window attached to this check shows the results; a window of another check is left alone.

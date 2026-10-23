@@ -207,6 +207,14 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
 - (void)viewWillAppear {
     [super viewWillAppear];
     [self refreshLastCheck];
+    // The page stays open while a check finishes: the time it shows would otherwise go stale.
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(refreshLastCheck)
+                                                 name:FCUUpdateCheckCompletedNotification object:nil];
+}
+
+- (void)viewDidDisappear {
+    [super viewDidDisappear];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:FCUUpdateCheckCompletedNotification object:nil];
 }
 
 #pragma mark - Building blocks
@@ -423,6 +431,8 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     return [NSString stringWithFormat:@"page y=%.0f x=%.0f, view %.0fx%.0f", _page.frame.origin.y, _page.frame.origin.x,
             self.view.frame.size.width, self.view.frame.size.height];
 }
+
+- (NSString *)debugLastCheckText { return _lastCheck.stringValue; }
 
 - (void)debugExpandAdvanced {
     if (_advanced.hidden) [self toggleAdvanced:nil];

@@ -115,6 +115,29 @@ json applyChecks() {
     return j;
 }
 
+// The Last check line follows a check that completes while the page is open, through the real delivery path,
+// and stops following once the page is gone.
+json lastCheckRefreshChecks() {
+    int64_t saved = GetAutomaticCheckLastRun();
+    int64_t old = (int64_t)time(nullptr) - 30 * 86400;
+    FCUPreferencesController *prefs = [[FCUPreferencesController alloc] init];
+    (void)prefs.view;
+    DebugSetAutomaticCheckLastRun(old);
+    [prefs viewWillAppear];
+    NSString *before = [prefs debugLastCheckText];
+    bool began = TryBeginUpdateCheck();
+    MarkCheckCompletedNow();
+    DeliverCheckResults(CurrentUpdateCheckId(), {}, "", false);
+    NSString *after = [prefs debugLastCheckText];
+    [prefs viewDidDisappear];
+    DebugSetAutomaticCheckLastRun(old);
+    DeliverCheckResults(CurrentUpdateCheckId(), {}, "", false);
+    NSString *hidden = [prefs debugLastCheckText];
+    DebugSetAutomaticCheckLastRun(saved);
+    return {{"began", began}, {"before", before.UTF8String}, {"after", after.UTF8String},
+            {"refreshed_when_visible", ![after isEqualToString:before]}, {"not_refreshed_when_hidden", [hidden isEqualToString:after]}};
+}
+
 // Off screen renders of the preferences page and the results window (see Scripts/test_batch.sh).
 json snapshots(std::vector<CheckResult> const& results) {
     json j;
@@ -511,6 +534,7 @@ public:
                     {"built_in_rows", std::count_if(results.begin(), results.end(), [](CheckResult const& r) { return r.dllName == "Core"; })}};
                 (*log)["snapshots"] = snapshots(results);
                 (*log)["apply"] = applyChecks();
+                (*log)["last_check_refresh"] = lastCheckRefreshChecks();
                 SetAutomaticCheckIntervalDays(11);
                 SetIncludePrereleases(true);
                 (*log)["settings_set"] = settingsSnapshot();
