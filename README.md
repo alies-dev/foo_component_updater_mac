@@ -61,6 +61,17 @@ export FB2K_SDK_PATH=/path/to/SDK-2026-10-01   # built SDK libraries, not part o
 
 GitHub Actions builds and tests every pull request and every push to `main`. A release is made by pushing a tag `vX.Y.Z` that matches `FCU_VERSION` in `src/version.h`; the matching `CHANGELOG.md` section becomes the release notes, so keep it to a few user visible bullets. More notes are in [docs/sdk-quirks.md](docs/sdk-quirks.md).
 
+## Components with native update support
+
+These components declare their own update source (`FB2KUpdateSource`), so the updater finds them without any catalog or registry:
+
+| Component | Source | Since |
+| --- | --- | --- |
+| [foo_ui_panels](https://github.com/santiagorod92/foo_ui_panels) | GitHub releases | 1.15.0 |
+| [foo_navidrome](https://github.com/santiagorod92/foo_navidrome) | GitHub releases | 1.32.0 |
+
+Older versions of these, and other components, are found through the foobar2000.org catalog, the shared registry or your custom sources when they are listed there.
+
 ## Credits
 
 The update checking logic comes from [foo_component_update_checker](https://github.com/p2ashiura/foo_component_update_checker) by p2ashiura (MIT) and its shared registry [foo_component_update_checker-registry](https://github.com/p2ashiura/foo_component_update_checker-registry). The build layout follows [JendaT/fb2k-components-mac-suite](https://github.com/JendaT/fb2k-components-mac-suite). JSON parsing by [nlohmann/json](https://github.com/nlohmann/json).
