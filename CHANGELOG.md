@@ -2,6 +2,12 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+* Preferences explain "Include prereleases" under the checkbox.
+
 ## [0.3.1] - 2026-10-26
 
 ### Added

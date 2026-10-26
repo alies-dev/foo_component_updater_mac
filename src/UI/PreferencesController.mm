@@ -290,7 +290,10 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     lastRow.edgeInsets = NSEdgeInsetsMake(0, kIndent, 0, 0);
 
     _prereleases = [NSButton checkboxWithTitle:@"Include prereleases" target:self action:@selector(prereleasesChanged:)];
-    _prereleases.toolTip = @"Also reports versions the author marks as not final. They may be less stable.";
+    NSTextField *prereleasesHelp = [self paragraph:@"Also offers beta and test versions, which may be less stable." small:YES];
+    prereleasesHelp.preferredMaxLayoutWidth = kContentWidth - kIndent;
+    NSStackView *prereleasesRow = [NSStackView stackViewWithViews:@[prereleasesHelp]];
+    prereleasesRow.edgeInsets = NSEdgeInsetsMake(0, kIndent, 0, 0);
 
     NSBox *separator = [[NSBox alloc] initWithFrame:NSZeroRect];
     separator.boxType = NSBoxSeparator;
@@ -370,12 +373,13 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     _advanced.edgeInsets = NSEdgeInsetsMake(0, kIndent, 0, 0);
     _advanced.hidden = YES;
 
-    _page = [self vertical:@[title, summary, autoRow, lastRow, _prereleases, separator, disclosureRow, _advanced] spacing:6];
+    _page = [self vertical:@[title, summary, autoRow, lastRow, _prereleases, prereleasesRow, separator, disclosureRow, _advanced] spacing:6];
     [_page setCustomSpacing:4 afterView:title];
     [_page setCustomSpacing:16 afterView:summary];
     [_page setCustomSpacing:2 afterView:autoRow];
     [_page setCustomSpacing:10 afterView:lastRow];
-    [_page setCustomSpacing:16 afterView:_prereleases];
+    [_page setCustomSpacing:2 afterView:_prereleases];
+    [_page setCustomSpacing:16 afterView:prereleasesRow];
     [_page setCustomSpacing:16 afterView:separator];
     [_page setCustomSpacing:8 afterView:disclosureRow];
     _page.translatesAutoresizingMaskIntoConstraints = NO;
