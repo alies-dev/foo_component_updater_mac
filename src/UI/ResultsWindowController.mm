@@ -16,16 +16,20 @@ namespace {
 
 NSString *ns(std::string const& s) { return [NSString stringWithUTF8String:s.c_str()] ?: @""; }
 
+NSDate *releasedDate(std::string const& iso) {
+    static NSISO8601DateFormatter *parser = [NSISO8601DateFormatter new];
+    return iso.empty() ? nil : [parser dateFromString:ns(iso)];
+}
+
 // "2 Oct 2026" style in the user's locale; "" when GitHub gave no usable date.
 NSString *releasedText(std::string const& iso) {
-    static NSISO8601DateFormatter *parser = [NSISO8601DateFormatter new];
     static NSDateFormatter *formatter = [] {
         NSDateFormatter *f = [NSDateFormatter new];
         f.dateStyle = NSDateFormatterMediumStyle;
         f.timeStyle = NSDateFormatterNoStyle;
         return f;
     }();
-    NSDate *date = iso.empty() ? nil : [parser dateFromString:ns(iso)];
+    NSDate *date = releasedDate(iso);
     return date ? [formatter stringFromDate:date] : @"";
 }
 
@@ -56,6 +60,8 @@ NSString *statusText(UpdateStatus s) {
 @interface FCUResultRow : NSObject
 @property (copy) NSString *component, *installed, *latest, *released, *status, *source, *tooltip, *releaseUrl, *releaseNotes, *about;
 @property BOOL prerelease;
+@property (copy) NSDate *releasedDate; // nil when unknown; sort key of the Released column
+@property NSInteger statusOrder;       // statusRank; sort key of the Status column
 @property (copy) NSString *name, *blockReason, *backupVersion; // file name, why not installable ("" when it is), backup version ("" when none)
 @property UpdateStatus statusCode;
 @property BOOL staged, failed;
@@ -193,6 +199,14 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         // "Release notes" is never squeezed at the default window width.
         bool flexible = [c.ident isEqualToString:@"component"];
         col.resizingMask = flexible ? (NSTableColumnAutoresizingMask | NSTableColumnUserResizingMask) : NSTableColumnUserResizingMask;
+        // Clicking a title sorts by it; versions compare numerically ("1.10" after "1.9").
+        if ([c.ident isEqualToString:@"released"]) {
+            col.sortDescriptorPrototype = [NSSortDescriptor sortDescriptorWithKey:@"releasedDate" ascending:NO];
+        } else if ([c.ident isEqualToString:@"status"]) {
+            col.sortDescriptorPrototype = [NSSortDescriptor sortDescriptorWithKey:@"statusOrder" ascending:YES];
+        } else if (![c.ident isEqualToString:@"update"] && ![c.ident isEqualToString:@"notes"]) {
+            col.sortDescriptorPrototype = [NSSortDescriptor sortDescriptorWithKey:c.ident ascending:YES selector:@selector(localizedStandardCompare:)];
+        }
         [_table addTableColumn:col];
     }
     _table.columnAutoresizingStyle = NSTableViewUniformColumnAutoresizingStyle;
@@ -343,6 +357,8 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.prerelease = r->prerelease;
         row.releaseNotes = ns(r->releaseNotes);
         row.released = releasedText(r->releasedAt);
+        row.releasedDate = releasedDate(r->releasedAt);
+        row.statusOrder = statusRank(r->status);
         row.about = ns(r->about);
         row.status = statusText(r->status);
         row.statusCode = r->status;
@@ -369,7 +385,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         }
         [rows addObject:row];
     }
-    _rows = rows;
+    _rows = [rows sortedArrayUsingDescriptors:_table.sortDescriptors]; // keeps the order the user clicked
     [_table reloadData];
     [self updateControls];
 
@@ -527,6 +543,11 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
 #endif
 
 #pragma mark - Table
+
+- (void)tableView:(NSTableView *)tableView sortDescriptorsDidChange:(NSArray<NSSortDescriptor *> *)oldDescriptors {
+    _rows = [_rows sortedArrayUsingDescriptors:tableView.sortDescriptors];
+    [tableView reloadData];
+}
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
     return _rows.count;
