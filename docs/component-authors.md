@@ -60,7 +60,7 @@ When your component is superseded (renamed, merged into another one, taken over 
     <key>source</key><string>github</string>
     <key>owner</key><string>new-owner</string>
     <key>repo</key><string>foo_example_ng</string>
-    <key>migration</key><string>https://github.com/new-owner/foo_example_ng#migrating</string>
+    <key>migration_url</key><string>https://github.com/new-owner/foo_example_ng#migrating</string>
 </dict>
 ```
 
@@ -68,7 +68,7 @@ Rules:
 
 * `component` is required: the successor's file name (letters, digits, `.`, `_`, `-`, `+`), not your own.
 * `source`, `owner`, `repo` and `url` say where the successor's releases live and follow the `FB2KUpdateSource` rules above. Declare them: the successor is never looked up in the shared registry or the foobar2000.org catalog, because a list run by someone else must not decide which code your declaration installs. Only a successor that the updater's built in list knows can go without them; when the list knows it, the list's source is used even if you declare another one.
-* `migration` is optional: an `https://` page (printable ASCII, no user name before the host) that tells users what to set up again, such as logging in once more. The confirmation shows it as a link, and after the restart that completes the switch foobar2000 offers it once. It opens only when the user clicks it.
+* `migration_url` is optional: an `https://` page (printable ASCII, no user name before the host) that tells users what to set up again, such as logging in once more. The confirmation shows it as a link, and after the restart that completes the switch foobar2000 offers it once. It opens only when the user clicks it.
 * `team` is optional: the successor's Team ID (10 capital letters or digits). If your component is signed with a Developer ID, the successor must be signed by the same team unless `team` names another one. Ad hoc signed components have nothing to pin.
 * No other keys are allowed. It is a separate key on purpose: `FB2KUpdateSource` accepts no other keys, and older versions of the updater would drop the whole update source.
 * Once a user has that release, the results window shows the row as "Replaced" with the successor's version. Ticking it and clicking Install downloads the successor (same package rules as above, a valid signature and a bundle identifier) and removes your component at the next start of foobar2000. Users can keep yours instead (right click > Keep).

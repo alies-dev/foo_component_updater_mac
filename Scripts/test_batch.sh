@@ -553,7 +553,7 @@ run_m2() {
     cp -R "$WORK/good/mac/foo_abx.component" "$PROFILE/user-components/foo_abx/"
     /usr/libexec/PlistBuddy -c "Add :FB2KReplacedBy dict" -c "Add :FB2KReplacedBy:component string foo_abx_ng" -c "Add :FB2KReplacedBy:source string github" \
         -c "Add :FB2KReplacedBy:owner string fcu-test" -c "Add :FB2KReplacedBy:repo string foo_abx_ng" \
-        -c "Add :FB2KReplacedBy:migration string https://github.com/fcu-test/foo_abx_ng#migrating" "$installed/Contents/Info.plist"
+        -c "Add :FB2KReplacedBy:migration_url string https://github.com/fcu-test/foo_abx_ng#migrating" "$installed/Contents/Info.plist"
     codesign --force --sign - "$installed" >/dev/null 2>&1 || { fail "codesign foo_abx with FB2KReplacedBy"; exit 1; }
     mkdir -p /tmp/fcu-ui
     BATCH_PID=""

@@ -18,7 +18,7 @@ struct Replacement {
 };
 
 // Strict parse of an FB2KReplacedBy dictionary (given as JSON): "component" required; optional
-// source fields under the FB2KUpdateSource rules (all or nothing), "migration" (https URL) and
+// source fields under the FB2KUpdateSource rules (all or nothing), "migration_url" (https URL) and
 // "team" (10 character Team ID). Errors start "Invalid FB2KReplacedBy: ".
 bool parseReplacedBy(std::string const& json, Replacement& out, std::string& error);
 

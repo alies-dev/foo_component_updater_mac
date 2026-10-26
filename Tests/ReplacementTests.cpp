@@ -23,8 +23,8 @@ int main() {
     CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\"}", r, err), "with a source");
     CHECK(r.hasSource && r.source.dllName == "foo_new" && r.source.source == "github" && r.source.owner == "o" && r.source.repo == "r", "source belongs to the successor");
     CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"source\":\"hyv\",\"url\":\"https://foobar.hyv.fi/?view=foo_new\"}", r, err) && r.source.url.size(), "url source");
-    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"migration\":\"https://github.com/o/r#migrating\",\"team\":\"ABCDE12345\"}", r, err)
-          && r.migration == "https://github.com/o/r#migrating" && r.team == "ABCDE12345" && !r.hasSource, "migration and team are not source fields");
+    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"migration_url\":\"https://github.com/o/r#migrating\",\"team\":\"ABCDE12345\"}", r, err)
+          && r.migration == "https://github.com/o/r#migrating" && r.team == "ABCDE12345" && !r.hasSource, "migration_url and team are not source fields");
     rejects("{", "Invalid");
     rejects("null", "must be a dictionary");
     rejects("{}", "\"component\"");
@@ -40,13 +40,14 @@ int main() {
     rejects("{\"component\":\"foo_new\",\"owner\":\"o\",\"repo\":\"r\"}", "\"source\" is required");
     rejects("{\"component\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\"}", "\"owner\" and \"repo\" are required");
     rejects("{\"component\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\",\"url\":\"https://x.y/\"}", "not \"url\"");
-    rejects("{\"component\":\"foo_new\",\"migration\":\"http://x.y/\"}", "\"migration\"");
-    rejects("{\"component\":\"foo_new\",\"migration\":\"https://github.com@evil.example/\"}", "\"migration\"");
-    rejects("{\"component\":\"foo_new\",\"migration\":\"https://xn--gthub.com/\\u00e9\"}", "\"migration\"");
-    rejects("{\"component\":\"foo_new\",\"migration\":7}", "\"migration\"");
+    rejects("{\"component\":\"foo_new\",\"migration_url\":\"http://x.y/\"}", "\"migration_url\"");
+    rejects("{\"component\":\"foo_new\",\"migration_url\":\"https://github.com@evil.example/\"}", "\"migration_url\"");
+    rejects("{\"component\":\"foo_new\",\"migration_url\":\"https://xn--gthub.com/\\u00e9\"}", "\"migration_url\"");
+    rejects("{\"component\":\"foo_new\",\"migration_url\":7}", "\"migration_url\"");
+    rejects("{\"component\":\"foo_new\",\"migration\":\"https://x.y/\"}", "unknown field \"migration\"");
     rejects("{\"component\":\"foo_new\",\"team\":\"abcde12345\"}", "\"team\"");
     rejects("{\"component\":\"foo_new\",\"team\":\"ABCDE1234\"}", "\"team\"");
-    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"migration\":\"https://x.y/a?b=c@d\"}", r, err), "an @ after the host is fine");
+    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"migration_url\":\"https://x.y/a?b=c@d\"}", r, err), "an @ after the host is fine");
 
     g_context = "lookup";
     std::map<std::string, Replacement> builtIn;

@@ -36,7 +36,7 @@ bool parseObject(nlohmann::json const& obj, Replacement& out, std::string& error
     }
     for (auto it = obj.begin(); it != obj.end(); ++it) {
         std::string const& k = it.key();
-        if (k != "component" && k != "migration" && k != "team" && k != "source" && k != "owner" && k != "repo" && k != "url") {
+        if (k != "component" && k != "migration_url" && k != "team" && k != "source" && k != "owner" && k != "repo" && k != "url") {
             error = "unknown field \"" + k + "\"";
             return false;
         }
@@ -50,13 +50,13 @@ bool parseObject(nlohmann::json const& obj, Replacement& out, std::string& error
     r.name = normalizeComponentName(component->get<std::string>());
     nlohmann::json fields = obj;
     fields.erase("component");
-    if (auto m = fields.find("migration"); m != fields.end()) {
+    if (auto m = fields.find("migration_url"); m != fields.end()) {
         if (!m->is_string() || !isMigrationUrl(m->get<std::string>())) {
-            error = "\"migration\" must be an https:// URL of printable ASCII without a user name";
+            error = "\"migration_url\" must be an https:// URL of printable ASCII without a user name";
             return false;
         }
         r.migration = m->get<std::string>();
-        fields.erase("migration");
+        fields.erase("migration_url");
     }
     if (auto t = fields.find("team"); t != fields.end()) {
         std::string const team = t->is_string() ? t->get<std::string>() : "";
