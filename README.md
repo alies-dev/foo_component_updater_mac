@@ -1,6 +1,6 @@
 # foo_component_updater_mac
 
-foobar2000 for Mac checks only itself for updates; this component checks the components you added.
+foobar2000 for Mac checks only itself for updates. Third-party components are left as they are, whether they came from the [official component repository](https://www.foobar2000.org/components/system/mac) or from GitHub; this component checks them and installs the updates you choose.
 
 [Component topic on hydrogenaudio](https://hydrogenaudio.org/index.php/topic,130098.0.html).
 
