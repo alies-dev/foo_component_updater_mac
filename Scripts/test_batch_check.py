@@ -33,7 +33,7 @@ def stub_paths(stub_log):
 def common(log):
     reg = log["registered"]
     check("menu command registered in Help",
-          len(reg["menu"]) == 1 and reg["menu"][0]["name"] == "Check for Component Updates..." and reg["menu"][0]["in_help_menu"], reg["menu"])
+          len(reg["menu"]) == 1 and reg["menu"][0]["name"] == "Check for Third-Party Component Updates..." and reg["menu"][0]["in_help_menu"], reg["menu"])
     check("preferences page registered under Tools",
           len(reg["preferences"]) == 1 and reg["preferences"][0]["name"] == "Component Updates" and reg["preferences"][0]["under_tools"], reg["preferences"])
     for r in log["rows"]:
@@ -283,7 +283,7 @@ def main():
         t = log.get("triggers", {})
         check("foobar2000's own update menu titles (app and Help menu) start no check and show no updates page",
               t.get("old_menu_titles") == {"begun_delta": 0, "page_visible": False}, t.get("old_menu_titles"))
-        check("Help > Check for Component Updates... twice in a row: 1 check begun, its completion is recorded as the last check",
+        check("Help > Check for Third-Party Component Updates... twice in a row: 1 check begun, its completion is recorded as the last check",
               t.get("manual", {}).get("begun_delta") == 1 and t.get("manual", {}).get("last_check_recorded") is True, t.get("manual"))
         check("the command with the page already visible starts exactly 1 check", t.get("manual_page_visible") == {"begun_delta": 1}, t.get("manual_page_visible"))
         p = t.get("periodic", {})

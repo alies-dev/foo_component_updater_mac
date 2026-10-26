@@ -327,7 +327,7 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         });
     };
 
-    // 2. Help > Check for Component Updates... with the page already visible but idle.
+    // 2. Help > Check for Third-Party Component Updates... with the page already visible but idle.
     auto manualPageVisible = [=] {
         *begun0 = DebugChecksBegun();
         ShowUpdatesPage();

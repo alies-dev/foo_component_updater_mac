@@ -14,7 +14,7 @@
 #   down       stub not listening: network errors, no crash
 #   ratelimit  stub answers 403 with x-ratelimit headers: message, no further API calls
 #   badregistry registry entries that must never reach a URL
-#   triggers   Help > Check for Component Updates... and the periodic evaluation (counted checks), and that foobar2000's own update menu titles start none
+#   triggers   Help > Check for Third-Party Component Updates... and the periodic evaluation (counted checks), and that foobar2000's own update menu titles start none
 #
 # M2 runs the install scenarios in the real foobar2000 (the chains are linked by main_restart() calls of the component itself):
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts

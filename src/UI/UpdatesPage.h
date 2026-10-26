@@ -24,7 +24,7 @@ extern NSNotificationName const FCUUpdateCheckCompletedNotification;
 
 // Main thread only.
 
-// Help > Check for Component Updates... and Check Now: shows Preferences at our page
+// Help > Check for Third-Party Component Updates... and Check Now: shows Preferences at our page
 // (ui_control::get()->show_preferences(fcu::guid_preferences_page)) and starts a check, unless one is running,
 // which the page then shows when it ends (no second check).
 void ShowUpdatesPage();

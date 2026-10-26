@@ -14,15 +14,15 @@ const CGFloat kContentWidth = 440; // the settings block; the table below it tak
 const CGFloat kGap = 16;
 const CGFloat kIndent = 18;
 
-NSString *const kSummary = @"Finds newer versions of components you added, which foobar2000\u2019s own update check does not cover, and installs the ones you choose. The results are listed below.";
+NSString *const kSummary = @"Checks the third-party components you added for newer versions and installs the ones you choose. foobar2000 and its built in components are updated with foobar2000 itself, through its own update check.";
 
 NSArray<NSArray<NSString *> *> *helpRows() {
     return @[
-        @[@"Purpose", @"Reports newer versions of the components you added to foobar2000 and lists them on this page. Nothing is installed until you tick an update in the list and click Install; the replaced version is kept for Restore Previous and the change applies after a restart."],
-        @[@"Why", @"foobar2000\u2019s Check For New Versions covers foobar2000 only, not components you added. Built in components update with foobar2000 and are not checked here."],
+        @[@"Purpose", @"Reports newer versions of the third-party components you added to foobar2000 and lists them on this page. Nothing is installed until you tick an update in the list and click Install; the replaced version is kept for Restore Previous and the change applies after a restart."],
+        @[@"Why", @"foobar2000\u2019s Check For New Versions covers foobar2000 and its built in components only, not the third-party components you added. Built in components update with foobar2000 and are not checked here."],
         @[@"Schedule", @"Shortly after foobar2000 starts, then every 6 hours while it is open, once the last check is at least the chosen number of days old. This page opens only when an update is found."],
-        @[@"Manual", @"Check Now, or Help > Check for Component Updates..."],
-        @[@"Needed if", @"You added components and want to know when they have newer versions."],
+        @[@"Manual", @"Check Now, or Help > Check for Third-Party Component Updates..."],
+        @[@"Needed if", @"You added third-party components and want to know when they have newer versions."],
         @[@"Not needed if", @"You added none, or you prefer to check yourself. Turn off automatic checks, or remove this component in Preferences > Components."],
         @[@"Network", @"Contacts GitHub, foobar2000.org and a shared list of component sources on raw.githubusercontent.com. No personal data is sent."],
     ];
@@ -188,7 +188,7 @@ static __weak FCUPreferencesController *g_shownPage = nil;
 #pragma mark - Page
 
 - (void)buildUI {
-    NSTextField *title = [NSTextField labelWithString:@"Component Updates"];
+    NSTextField *title = [NSTextField labelWithString:@"Third-Party Component Updates"];
     title.font = [NSFont systemFontOfSize:15 weight:NSFontWeightRegular];
     NSTextField *summary = [self paragraph:kSummary small:YES];
 
@@ -220,7 +220,7 @@ static __weak FCUPreferencesController *g_shownPage = nil;
 
     _days = [NSTextField labelWithString:@"days"];
     NSButton *checkNow = [NSButton buttonWithTitle:@"Check Now" target:self action:@selector(checkNow:)];
-    checkNow.toolTip = @"Checks all added components now. Also in Help > Check for Component Updates...";
+    checkNow.toolTip = @"Checks all added third-party components now. Also in Help > Check for Third-Party Component Updates...";
 
     NSStackView *autoRow = [NSStackView stackViewWithViews:@[_autoCheck, _interval, _stepper, _days, [self spacer], checkNow]];
     autoRow.spacing = 4;
@@ -237,12 +237,15 @@ static __weak FCUPreferencesController *g_shownPage = nil;
     NSStackView *prereleasesRow = [NSStackView stackViewWithViews:@[prereleasesHelp]];
     prereleasesRow.edgeInsets = NSEdgeInsetsMake(0, kIndent, 0, 0);
 
-    _page = [self vertical:@[title, summary, autoRow, lastRow, _prereleases, prereleasesRow] spacing:6];
+    NSTextField *listLabel = [self paragraph:@"Installed third-party components" small:YES];
+
+    _page = [self vertical:@[title, summary, autoRow, lastRow, _prereleases, prereleasesRow, listLabel] spacing:6];
     [_page setCustomSpacing:4 afterView:title];
     [_page setCustomSpacing:16 afterView:summary];
     [_page setCustomSpacing:2 afterView:autoRow];
     [_page setCustomSpacing:10 afterView:lastRow];
     [_page setCustomSpacing:2 afterView:_prereleases];
+    [_page setCustomSpacing:kGap afterView:prereleasesRow];
     _page.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_page];
 
@@ -250,7 +253,7 @@ static __weak FCUPreferencesController *g_shownPage = nil;
     _updates.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_updates];
 
-    NSButton *help = makeHelpButton(self, @selector(showHelp:), @"About Component Updates", @"About Component Updates");
+    NSButton *help = makeHelpButton(self, @selector(showHelp:), @"About Third-Party Component Updates", @"About Third-Party Component Updates");
     [self.view addSubview:help];
     NSLayoutConstraint *minHeight = [_updates.heightAnchor constraintGreaterThanOrEqualToConstant:160];
     minHeight.priority = 750; // a very short pane squeezes the table rather than breaking the layout
@@ -258,7 +261,7 @@ static __weak FCUPreferencesController *g_shownPage = nil;
         [_page.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:kMargin],
         [_page.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:kMargin],
         [_page.widthAnchor constraintEqualToConstant:kContentWidth],
-        [_updates.topAnchor constraintEqualToAnchor:_page.bottomAnchor constant:kGap],
+        [_updates.topAnchor constraintEqualToAnchor:_page.bottomAnchor constant:6],
         [_updates.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:kMargin],
         [_updates.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-kMargin],
         [_updates.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:-kMargin],

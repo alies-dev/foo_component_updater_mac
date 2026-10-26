@@ -12,7 +12,7 @@ inline const GUID guid_check_command =
 inline const GUID guid_preferences_page =
 { 0x72bec33e, 0xadf8, 0x40d7, { 0x8e, 0xa2, 0xbd, 0xce, 0xf7, 0xa8, 0xe2, 0xa3 } };
 
-inline const char* const k_checkCommandName = "Check for Component Updates...";
+inline const char* const k_checkCommandName = "Check for Third-Party Component Updates...";
 inline const char* const k_preferencesPageName = "Component Updates";
 
 } // namespace fcu

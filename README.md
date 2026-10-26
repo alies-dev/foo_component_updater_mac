@@ -5,9 +5,9 @@ foobar2000 for Mac checks only itself for updates; this component checks the com
 [Component topic on hydrogenaudio](https://hydrogenaudio.org/index.php/topic,130098.0.html).
 
 <p align="center">
-  <img src="docs/images/updates-page.png" alt="Preferences > Tools > Component Updates: schedule settings above a list of installed components with name, version, module and status" width="720">
+  <img src="docs/images/updates-page.png" alt="Preferences > Tools > Component Updates (Third-Party Component Updates): schedule settings above a list of installed third-party components with name, version, module and status" width="720">
   <br>
-  <em>Preferences > Tools > Component Updates (Help > Check for Component Updates... opens it and checks): every installed component with its version, module and status, like foobar2000's Components page.</em>
+  <em>Preferences > Tools > Component Updates (Help > Check for Third-Party Component Updates... opens it and checks): every installed third-party component with its version, module and status, like foobar2000's Components page. foobar2000 and its built in components are updated with foobar2000 itself.</em>
 </p>
 
 ## Install
@@ -20,13 +20,13 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 
 ## Features
 
-* The update list is on Preferences > Tools > Component Updates, laid out like foobar2000's Components page: Name, Version, Module and Status for each component, with a tick box per row. Help > Check for Component Updates... opens the page and checks. Hover the status for the release date, source and notes, double click a row to open its release page.
+* The update list is on Preferences > Tools > Component Updates (headed "Third-Party Component Updates"), laid out like foobar2000's Components page: Name, Version, Module and Status for each component, with a tick box per row. It covers the third-party components you added, not foobar2000 itself. Help > Check for Third-Party Component Updates... opens the page and checks. Hover the status for the release date, source and notes, double click a row to open its release page.
 * Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back. The updater's own row works the same way.
 * Shows "Replaced" when a component names its successor, and switches to it when you tick the row: the successor is installed and the old component removed at the next start. Migration notes the author links to are offered with one click, before the switch and once after it. Right click > Keep stays with the old one. When a component says foobar2000 itself now includes its feature and you run that version, the row is "Replaced" too and Install only removes the component.
 * Warns when two installed components do the same job (Last.fm scrobblers so far): each would do the work twice.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
 * Checks automatically every few days.
-* foobar2000's built in components are hidden in the list unless you tick "Show built in components".
+* foobar2000's built in components are hidden in the list unless you tick "Show built in components (updated with foobar2000)".
 
 ## Privacy and safety
 

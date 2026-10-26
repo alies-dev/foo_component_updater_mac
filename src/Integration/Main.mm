@@ -38,7 +38,7 @@ public:
     void get_name(t_uint32, pfc::string_base& out) override { out = fcu::k_checkCommandName; }
 
     bool get_description(t_uint32, pfc::string_base& out) override {
-        out = "Checks installed third party components for newer versions and installs the updates you choose.";
+        out = "Checks the third-party components you added for newer versions and installs the updates you choose. foobar2000 and its built in components update with foobar2000.";
         return true;
     }
 

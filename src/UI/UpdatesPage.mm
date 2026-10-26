@@ -679,7 +679,7 @@ FCUUpdatesModel *scratchModel(std::vector<CheckResult> const& results) {
     _scroll.documentView = _table;
     [self addSubview:_scroll];
 
-    _showBuiltIn = [NSButton checkboxWithTitle:@"Show built in components" target:self action:@selector(showBuiltInChanged:)];
+    _showBuiltIn = [NSButton checkboxWithTitle:@"Show built in components (updated with foobar2000)" target:self action:@selector(showBuiltInChanged:)];
     _showBuiltIn.translatesAutoresizingMaskIntoConstraints = NO;
     [self addSubview:_showBuiltIn];
 
@@ -796,9 +796,8 @@ FCUUpdatesModel *scratchModel(std::vector<CheckResult> const& results) {
         field.lineBreakMode = NSLineBreakByTruncatingTail;
     }
     bool const status = [ident isEqualToString:@"status"];
-    // Like the native list: third party components in bold, built in ones regular and dimmed.
-    bool const bold = status ? !row.builtIn && (row.statusCode == UpdateStatus::UpdateAvailable || row.statusCode == UpdateStatus::Replaced)
-                             : !row.builtIn;
+    // Regular text like the native list, built in components dimmed; a row with something to install stands out in bold.
+    bool const bold = !row.builtIn && (row.statusCode == UpdateStatus::UpdateAvailable || row.statusCode == UpdateStatus::Replaced);
     field.font = bold ? [NSFont boldSystemFontOfSize:NSFont.systemFontSize] : [NSFont systemFontOfSize:NSFont.systemFontSize];
     field.textColor = status && (row.statusCode == UpdateStatus::Error || row.failed) ? NSColor.systemRedColor
         : status && row.overlap.length ? NSColor.systemOrangeColor
