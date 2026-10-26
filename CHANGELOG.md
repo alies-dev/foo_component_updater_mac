@@ -7,6 +7,13 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Added
 
 * Update checks for foo_dms_browser (UPnP) and foo_lastfm.
+* A Released column with the date of the latest release.
+* Hover over Release notes to read them, and over a component's name for its description.
+* Prereleases are marked "(beta)" in the Latest column.
+
+### Changed
+
+* The Source column is gone; hover over the latest version to see where it was found.
 
 ## [0.2.2] - 2026-10-23
 

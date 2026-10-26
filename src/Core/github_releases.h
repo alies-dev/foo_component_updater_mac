@@ -20,6 +20,8 @@ struct Release {
     std::string htmlUrl;
     bool draft = false;
     bool prerelease = false;
+    std::string body; // release notes as written by the author (Markdown), may be empty
+    std::string publishedAt; // ISO 8601, empty when GitHub gives none
     std::vector<ReleaseAsset> assets;
 };
 
@@ -29,6 +31,9 @@ struct ReleaseMatch {
     std::string releaseUrl;
     std::string downloadUrl;
     std::string assetName;
+    bool prerelease = false;
+    std::string notes; // textPreview of the release body
+    std::string publishedAt;
 };
 
 // Parses one page of GET /repos/{owner}/{repo}/releases.
@@ -38,6 +43,11 @@ bool parseReleases(std::string const& body, std::vector<Release>& out, std::stri
 // otherwise the text after a "-v" that forms a complete valid version.
 // Returns "" when nothing or more than one candidate qualifies.
 std::string versionFromTag(std::string const& tag);
+
+// Free text (release notes, about text) for a tooltip: \r\n, \r and \n end a line, trailing
+// blanks and blank lines at either end are dropped, runs of blank lines (spaces only count as
+// blank) become one, and the result is cut at a UTF-8 boundary with "…" when long.
+std::string textPreview(std::string const& body);
 
 enum class Selection { Found, NoMatch, Ambiguous };
 

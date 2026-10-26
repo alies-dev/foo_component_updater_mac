@@ -14,6 +14,7 @@ namespace fcu {
 namespace {
 
 constexpr size_t kMaxTagLength = 128;
+constexpr size_t kMaxNotesPreview = 1000;
 
 bool isIdentifierList(std::string const& s) {
     if (s.empty()) return false;
@@ -150,6 +151,10 @@ bool parseReleases(std::string const& body, std::vector<Release>& out, std::stri
             r.htmlUrl = item.value("html_url", "");
             r.draft = draft->get<bool>();
             r.prerelease = prerelease->get<bool>();
+            auto body = item.find("body"); // null when the author wrote no notes
+            if (body != item.end() && body->is_string()) r.body = body->get<std::string>();
+            auto published = item.find("published_at");
+            if (published != item.end() && published->is_string()) r.publishedAt = published->get<std::string>();
             if (item.contains("assets") && item["assets"].is_array()) {
                 for (auto const& a : item["assets"]) {
                     r.assets.push_back({a.value("name", ""), a.value("browser_download_url", "")});
@@ -179,6 +184,34 @@ std::string versionFromTag(std::string const& tag) {
     return candidate;
 }
 
+std::string textPreview(std::string const& body) {
+    std::string out;
+    bool blank = false; // a blank line was skipped since the last text
+    size_t pos = 0;
+    while (pos <= body.size()) {
+        size_t end = body.find_first_of("\r\n", pos);
+        if (end == std::string::npos) end = body.size();
+        std::string_view line(body.data() + pos, end - pos);
+        size_t last = line.find_last_not_of(" \t");
+        if (last == std::string_view::npos) {
+            blank = !out.empty();
+        } else {
+            if (!out.empty()) out.append(blank ? "\n\n" : "\n");
+            blank = false;
+            size_t first = out.empty() ? line.find_first_not_of(" \t") : 0;
+            out.append(line.substr(first, last + 1 - first));
+        }
+        pos = end + (body.compare(end, 2, "\r\n") == 0 ? 2 : 1); // \r\n, \r and \n all end a line
+    }
+    if (out.size() > kMaxNotesPreview) {
+        size_t cut = kMaxNotesPreview;
+        while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) --cut; // not inside a UTF-8 sequence
+        out.erase(cut);
+        out += "\u2026";
+    }
+    return out;
+}
+
 Selection selectRelease(std::vector<Release> const& releases, std::string const& componentKey,
                         bool includePrereleases, ReleaseMatch& out) {
     std::string const key = normalizeAssetText(componentKey);
@@ -201,6 +234,9 @@ Selection selectRelease(std::vector<Release> const& releases, std::string const&
         out.releaseUrl = r.htmlUrl;
         out.downloadUrl = best->url;
         out.assetName = best->name;
+        out.prerelease = r.prerelease;
+        out.notes = textPreview(r.body);
+        out.publishedAt = r.publishedAt;
         return Selection::Found;
     }
     return Selection::NoMatch;

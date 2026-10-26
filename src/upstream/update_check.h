@@ -16,6 +16,7 @@ struct InstalledComponentInfo {
     std::string fileName;
     std::string displayName;
     std::string installedVersion;
+    std::string about;              // the component's about text (author, description)
     bool hasBundleSource = false;   // Info.plist has an FB2KUpdateSource key
     std::string bundleSourceJson;   // that dictionary as JSON
 };
@@ -26,6 +27,10 @@ struct CheckResult {
     std::string installedVersion;
     std::string latestVersion;
     std::string releaseUrl;
+    bool prerelease = false;   // the author marked the latest release as a prerelease
+    std::string releaseNotes;  // preview of the release notes, empty when unknown
+    std::string releasedAt;    // ISO 8601 publish time of the latest release, empty when unknown
+    std::string about;         // the component's about text
     UpdateStatus status = UpdateStatus::Error;
     std::string errorMessage;
     std::string downloadUrl;   // package link, empty for sources that only offer a page
