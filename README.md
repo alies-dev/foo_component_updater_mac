@@ -26,6 +26,8 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 
 * A results window with the installed and the latest version of each component, its status and a link to the release notes.
 * Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back. The updater's own row works the same way.
+* Shows "Replaced" when a component names its successor, and switches to it when you tick the row: the successor is installed and the old component removed at the next start. Right click > Keep stays with the old one.
+* Warns when two installed components do the same job (Last.fm scrobblers so far): each would do the work twice.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
 * Checks automatically every few days.
 * foobar2000's built in components are hidden unless you ask for them.
@@ -34,6 +36,7 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 
 * Nothing is downloaded or installed until you tick an update and click Install. Only `.fb2k-component` packages are installed (GitHub `.zip` files are only reported), and only from the source the update was found at.
 * Before anything is replaced the package must have a valid code signature, the same bundle identifier as the installed component and, when the installed one has a Team ID, the same Team ID. The new version waits in foobar2000's `pending` folder and is applied at the next start.
+* A switch to a successor installs a different component, so there is no identity to compare: its package must have a valid signature and a bundle identifier, and the switch is confirmed first. The successor is named only by the old component's own `Info.plist` or by this updater's built in list.
 * HTTPS only. It contacts GitHub (releases and the shared registry), foobar2000.org and the release hosts named by the shared registry or a component's `FB2KUpdateSource`, and nothing else.
 * No personal data, no telemetry.
 

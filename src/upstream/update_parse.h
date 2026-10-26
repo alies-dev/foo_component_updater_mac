@@ -11,6 +11,7 @@ enum class UpdateStatus {
     ComparisonUnsupported,
     Error,
     NoSource,
+    Replaced, // another component took over (CheckResult::replacedBy); never from compareVersions
 };
 
 UpdateStatus compareVersions(std::string const& installedRaw, std::string const& latestRaw);

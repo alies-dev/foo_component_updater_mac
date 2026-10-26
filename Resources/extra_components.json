@@ -19,5 +19,8 @@
     { "dll": "foo_richtext_mac", "source": "github", "owner": "seongbin", "repo": "foo_richtext_mac" },
     { "dll": "foo_dms_browser", "source": "github", "owner": "sunick2009", "repo": "foo_upnp_mac" },
     { "dll": "foo_lastfm", "source": "github", "owner": "Scannou", "repo": "foo-lastfm" }
+  ],
+  "groups": [
+    { "title": "Last.fm scrobbler", "members": ["foo_jl_scrobble", "foo_mac_scrobble", "foo_lastfm", "foo_scrobbler_mac"] }
   ]
 }

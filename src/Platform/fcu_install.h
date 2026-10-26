@@ -23,8 +23,18 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
 // Stages backup/<name> (the version the last install replaced); the installed version becomes the backup.
 InstallOutcome restorePrevious(std::string const& name, std::string const& installedVersion, abort_callback& abort);
 
+// Replaces component `name` with the different component `replacement` at the next start: the package at `url`
+// goes to pending/<replacement> (signature checked, no identity to compare with) and pending/<name> becomes an
+// uninstall marker. When the replacement is installed or staged already, only the marker is written.
+// No backup is kept: once removed, `name` is no longer listed. Same rules as installUpdate otherwise.
+InstallOutcome switchComponent(std::string const& name, std::string const& replacement, std::string const& url,
+                               abort_callback& abort);
+
 // pending/<name>/<name>.component exists: an install that waits for a restart.
 bool isStaged(std::string const& name);
+
+// pending/<name> is an uninstall marker (an empty file): the component goes at the next start.
+bool isRemovalStaged(std::string const& name);
 
 // The version string of backup/<name>; false when there is no usable backup.
 bool backupVersion(std::string const& name, std::string& version);

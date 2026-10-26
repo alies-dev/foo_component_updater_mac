@@ -38,6 +38,7 @@ const char* statusName(UpdateStatus s) {
     case UpdateStatus::ComparisonUnsupported: return "unable_to_compare";
     case UpdateStatus::Error: return "error";
     case UpdateStatus::NoSource: return "no_source";
+    case UpdateStatus::Replaced: return "replaced";
     }
     return "";
 }
@@ -357,7 +358,7 @@ void writeLog(std::string const& path, json const& log) {
 
 json stateOf(std::string const& name, std::string* version = nullptr) {
     std::string backup;
-    json j = {{"pid", getpid()}, {"installed_version", ""}, {"staged", fcu::isStaged(name)}};
+    json j = {{"pid", getpid()}, {"installed_version", ""}, {"staged", fcu::isStaged(name)}, {"removal_staged", fcu::isRemovalStaged(name)}};
     j["backup_version"] = fcu::backupVersion(name, backup) ? backup : "";
     for (auto const& c : GetInstalledComponents()) {
         if (c.fileName != name) continue;
@@ -370,13 +371,15 @@ json stateOf(std::string const& name, std::string* version = nullptr) {
 // The install scenarios of `test_batch.sh m2`, one foobar2000 run each (config key foo_component_updater_mac.debug.m2).
 // Packages come from the stub (/pkg/<name>). install, restore, self-install and self-restore end in main_restart(): they set
 // the scenario of the next run and its log path (this one with the scenario name swapped) before restarting. The self-*
-// scenarios work on this component itself, the others on foo_abx.
+// scenarios work on this component itself, the others on foo_abx; switch replaces foo_abx with foo_abx_ng.
 void runInstallScenario(std::string const& path, std::string const& scenario) {
     auto log = std::make_shared<json>();
     auto version = std::make_shared<std::string>();
     (*log)["scenario"] = scenario;
     std::string const name = scenario.rfind("self-", 0) == 0 ? "foo_component_updater_mac" : "foo_abx";
     (*log)["before"] = stateOf(name, version.get());
+    bool const switching = scenario.rfind("switch", 0) == 0;
+    if (switching) (*log)["replacement_before"] = stateOf("foo_abx_ng");
     auto installed = GetInstalledComponents();
     auto results = std::make_shared<std::vector<CheckResult>>();
 
@@ -417,9 +420,44 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             attempt("other_developer", pkg("good"));
             attempt("forged_team", pkg("forgedteam"));
             attempt("same_developer", pkg("devid"));
+        } else if (scenario == "switch") {
+            auto rowOf = [&](std::vector<CheckResult> const& all) {
+                for (auto const& r : all) {
+                    if (r.dllName == "foo_abx") return r;
+                }
+                return CheckResult{};
+            };
+            auto describe = [](CheckResult const& r) {
+                return json{{"status", statusName(r.status)}, {"replaced_by", r.replacedBy}, {"origin", r.replacementOrigin}, {"kept", r.kept},
+                            {"latest", r.latestVersion}, {"source", r.sourceLabel}, {"asset", r.assetName}, {"note", r.note}};
+            };
+            // Kept: the row is checked as usual (the catalog has foo_abx 2.2.3) and says what it keeps.
+            SetReplacementKept("foo_abx", "foo_abx_ng", true);
+            (*log)["kept_row"] = describe(rowOf(RunUpdateCheck(installed, abort)));
+            SetReplacementKept("foo_abx", "foo_abx_ng", false);
+            *results = RunUpdateCheck(installed, abort);
+            CheckResult const r = rowOf(*results);
+            (*log)["row"] = describe(r);
+            (*log)["row"]["block_reason"] = fcu::installBlockReason(true, r.dllName, r.downloadUrl, r.assetName, false);
+            fcu::InstallOutcome o = fcu::switchComponent("foo_abx", r.replacedBy, r.downloadUrl, abort);
+            (*log)["outcomes"]["switch"] = {{"ok", o.ok}, {"message", o.message}};
+            next = "switch-after";
         }
         fb2k::inMainThread([=] {
             (*log)["after"] = stateOf(name);
+            if (switching) (*log)["replacement_after"] = stateOf("foo_abx_ng");
+            if (scenario == "switch") {
+                // The window with the replaced row, plus a row that shares its job with another installed component.
+                std::vector<CheckResult> shown = *results;
+                CheckResult overlap;
+                overlap.dllName = "foo_lastfm";
+                overlap.displayName = "Last.fm Scrobbler";
+                overlap.installedVersion = overlap.latestVersion = "1.0.22";
+                overlap.status = UpdateStatus::UpToDate;
+                overlap.overlap = "Same job as foo_jl_scrobble (Last.fm scrobbler). Keep only one.";
+                shown.push_back(overlap);
+                (*log)["snapshot_rows"] = DebugSnapshotResultsWindow(shown, false, "/tmp/fcu-ui/results-switch.png");
+            }
             if (scenario == "refuse") {
                 bool withBackup = false, without = true;
                 std::string title = DebugRestoreMenuItem(*results, "foo_abx", &withBackup);

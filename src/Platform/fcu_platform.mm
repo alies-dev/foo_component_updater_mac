@@ -20,8 +20,9 @@ std::string bundledResource(char const* name, char const* ext) {
     }
 }
 
-bool readBundleUpdateSource(std::string const& fileName, std::string& json) {
-    if (fileName.empty() || fileName[0] == '.' || fileName.find('/') != std::string::npos) return false;
+std::map<std::string, std::string> readBundleDictionaries(std::string const& fileName, std::vector<char const *> const& keys) {
+    std::map<std::string, std::string> found;
+    if (fileName.empty() || fileName[0] == '.' || fileName.find('/') != std::string::npos) return found;
     @autoreleasepool {
         // get_my_full_path() is <profile>/user-components/<name>/<name>.component on Mac.
         NSString *mine = [NSString stringWithUTF8String:core_api::get_my_full_path()];
@@ -32,16 +33,15 @@ bool readBundleUpdateSource(std::string const& fileName, std::string& json) {
             stringByAppendingPathComponent:@"Contents"] stringByAppendingPathComponent:@"Info.plist"];
 
         NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:plist];
-        id value = info[@"FB2KUpdateSource"];
-        if (!value) return false;
-        if (![value isKindOfClass:[NSDictionary class]] || ![NSJSONSerialization isValidJSONObject:value]) {
-            json = "null";
-            return true;
+        for (char const *key : keys) {
+            id value = info[[NSString stringWithUTF8String:key]];
+            if (!value) continue;
+            NSData *data = [value isKindOfClass:[NSDictionary class]] && [NSJSONSerialization isValidJSONObject:value]
+                ? [NSJSONSerialization dataWithJSONObject:value options:0 error:nil] : nil;
+            found[key] = data ? std::string(static_cast<const char *>(data.bytes), data.length) : "null";
         }
-        NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
-        json = data ? std::string(static_cast<const char *>(data.bytes), data.length) : "null";
-        return true;
     }
+    return found;
 }
 
 } // namespace fcu

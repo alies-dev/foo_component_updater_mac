@@ -22,4 +22,8 @@ bool validateSourceFields(RepositoryMappingEntry const& entry, std::string& erro
 bool parseBundleSource(std::string const& dllName, std::string const& json,
                        RepositoryMappingEntry& out, std::string& error);
 
+// The same rules for a source dictionary inside another key; `error` names no key.
+bool parseSourceDictionary(std::string const& dllName, std::string const& json,
+                           RepositoryMappingEntry& out, std::string& error);
+
 } // namespace fcu

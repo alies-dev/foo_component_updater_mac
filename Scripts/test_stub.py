@@ -6,6 +6,7 @@ foo_component_updater_mac.debug.api_base points here:
 
   /registry/known_components.json            shared registry
   /repos/JendaT/fb2k-components-mac-suite/releases   GitHub releases of the JendaT suite
+  /repos/fcu-test/foo_abx_ng/releases        one release whose asset is /pkg/foo_abx_ng (the replacement in m2 switch)
   /repos/<other>/releases                    404
   /components/view/foo_abx                   foobar2000.org catalog page
   /components/view/<other>                   catalog "No such component." page (HTTP 200, as the real site)
@@ -64,6 +65,12 @@ def main():
                         "x-ratelimit-reset": str(int(time.time()) + 3600)})
                 if path == "/repos/JendaT/fb2k-components-mac-suite/releases":
                     return self.reply(200, (fixtures / "jenda_releases.json").read_bytes())
+                if path == "/repos/fcu-test/foo_abx_ng/releases":
+                    return self.reply(200, json.dumps([{
+                        "tag_name": "v1.0.0", "html_url": "https://github.com/fcu-test/foo_abx_ng/releases/tag/v1.0.0",
+                        "draft": False, "prerelease": False, "body": "Takes over from foo_abx.", "published_at": "2026-10-26T10:00:00Z",
+                        "assets": [{"name": "foo_abx_ng.fb2k-component",
+                                    "browser_download_url": f"https://{self.headers['Host']}/pkg/foo_abx_ng"}]}]))
                 return self.reply(404, '{"message":"Not Found"}')
             if path == "/registry/known_components.json":
                 registry = json.loads((fixtures / "registry.json").read_bytes())
