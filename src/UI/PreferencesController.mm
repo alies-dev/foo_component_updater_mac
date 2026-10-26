@@ -1,15 +1,11 @@
 #import "PreferencesController.h"
 
 #include "../fb2k_sdk.h"
-#include "../Core/mapping_validation.h"
 #include "../Core/triggers.h"
 #include "../Integration/Settings.h"
 #include "../upstream/automatic_check.h"
-#include "../upstream/repository_mapping.h"
 #include "../upstream/update_check.h"
 #include "ResultsWindow.h"
-
-#import <objc/runtime.h>
 
 namespace {
 
@@ -20,9 +16,6 @@ const CGFloat kIndent = 18;
 
 NSString *const kSummary = @"Finds newer versions of components you added, which foobar2000\u2019s own update check does not cover, and installs the ones you choose.";
 
-NSString *const kSourcesPlaceholder =
-    @"[{ \"dll\": \"foo_example\", \"source\": \"github\",\n   \"owner\": \"author\", \"repo\": \"foo_example\" }]";
-
 NSArray<NSArray<NSString *> *> *helpRows() {
     return @[
         @[@"Purpose", @"Reports newer versions of the components you added to foobar2000 and lists them in a window. Nothing is installed until you tick an update there and click Install; the replaced version is kept for Restore Previous and the change applies after a restart."],
@@ -32,18 +25,6 @@ NSArray<NSArray<NSString *> *> *helpRows() {
         @[@"Needed if", @"You added components and want to know when they have newer versions."],
         @[@"Not needed if", @"You added none, or you prefer to check yourself. Turn off automatic checks, or remove this component in Preferences > Components."],
         @[@"Network", @"Contacts GitHub, foobar2000.org and a shared list of component sources on raw.githubusercontent.com. No personal data is sent."],
-    ];
-}
-
-// Starter text of "Insert Example"; the full format is in docs/custom-sources.md.
-NSString *const kRepositoryExample =
-    @"[{ \"dll\": \"foo_example\", \"source\": \"github\",\n   \"owner\": \"author\", \"repo\": \"foo_example\" }]";
-NSString *const kSourcesDocUrl = @"https://github.com/alies-dev/foo_component_updater_mac/blob/main/docs/custom-sources.md";
-
-NSArray<NSArray<NSString *> *> *sourcesHelpRows() {
-    return @[
-        @[@"About", @"For components marked \u201CNo source\u201D in the results. Each entry tells the updater where that component\u2019s author publishes releases."],
-        @[@"Name", @"dll is the name in brackets in the Component column."],
     ];
 }
 
@@ -75,51 +56,6 @@ NSView *makeInfoView(NSArray<NSArray<NSString *> *> *rows) {
         [grid.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-12],
         [grid.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:14],
         [grid.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-14],
-    ]];
-    [content setFrameSize:content.fittingSize];
-    return content;
-}
-
-} // namespace
-
-// Target of the "Format and examples" link button.
-@interface FCUDocLink : NSObject
-- (void)open:(id)sender;
-@end
-@implementation FCUDocLink
-- (void)open:(id)sender {
-    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:kSourcesDocUrl]];
-}
-@end
-
-namespace {
-
-// The short custom sources help: two rows and a link to the full format and examples.
-NSView *makeSourcesHelpView() {
-    NSView *info = makeInfoView(sourcesHelpRows());
-    info.translatesAutoresizingMaskIntoConstraints = NO;
-
-    FCUDocLink *target = [FCUDocLink new];
-    NSButton *link = [NSButton buttonWithTitle:@"" target:target action:@selector(open:)];
-    link.bordered = NO;
-    link.attributedTitle = [[NSAttributedString alloc] initWithString:@"Format and examples\u2026" attributes:@{
-        NSFontAttributeName: [NSFont systemFontOfSize:12],
-        NSForegroundColorAttributeName: NSColor.linkColor,
-        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)}];
-    link.toolTip = kSourcesDocUrl;
-    link.translatesAutoresizingMaskIntoConstraints = NO;
-    objc_setAssociatedObject(link, "fcu.docLink", target, OBJC_ASSOCIATION_RETAIN_NONATOMIC); // the button only holds its target weakly
-
-    NSView *content = [[NSView alloc] initWithFrame:NSZeroRect];
-    [content addSubview:info];
-    [content addSubview:link];
-    [NSLayoutConstraint activateConstraints:@[
-        [info.topAnchor constraintEqualToAnchor:content.topAnchor],
-        [info.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
-        [info.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
-        [link.topAnchor constraintEqualToAnchor:info.bottomAnchor constant:-4],
-        [link.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:14],
-        [link.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-12],
     ]];
     [content setFrameSize:content.fittingSize];
     return content;
@@ -163,7 +99,6 @@ void FCUShowHelpPopover(NSView *anchor) {
 }
 
 NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
-NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
 
 @interface FCUFlippedView : NSView
 @end
@@ -171,27 +106,14 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
 - (BOOL)isFlipped { return YES; }
 @end
 
-// Grey example shown while the sources box is empty; never takes the mouse.
-@interface FCUPlaceholderLabel : NSTextField
-@end
-@implementation FCUPlaceholderLabel
-- (NSView *)hitTest:(NSPoint)point { return nil; }
-@end
-
-@interface FCUPreferencesController () <NSTextViewDelegate, NSTextFieldDelegate>
+@interface FCUPreferencesController () <NSTextFieldDelegate>
 @end
 
 @implementation FCUPreferencesController {
     NSStackView *_page;
-    NSButton *_autoCheck, *_prereleases, *_disclosure, *_save, *_insertExample;
+    NSButton *_autoCheck, *_prereleases;
     NSStepper *_stepper;
-    NSTextField *_interval, *_days, *_lastCheck, *_message;
-    NSTextView *_sources;
-    FCUPlaceholderLabel *_placeholder;
-    NSStackView *_advanced;
-    NSPopover *_fieldsPopover;
-    NSString *_savedSources;
-    NSInteger _messageToken;
+    NSTextField *_interval, *_days, *_lastCheck;
     NSInteger _stepperValue; // the stepper's value after the last commit, to read the direction of a click
 }
 
@@ -295,93 +217,12 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     NSStackView *prereleasesRow = [NSStackView stackViewWithViews:@[prereleasesHelp]];
     prereleasesRow.edgeInsets = NSEdgeInsetsMake(0, kIndent, 0, 0);
 
-    NSBox *separator = [[NSBox alloc] initWithFrame:NSZeroRect];
-    separator.boxType = NSBoxSeparator;
-    separator.translatesAutoresizingMaskIntoConstraints = NO;
-    [separator.widthAnchor constraintEqualToConstant:kContentWidth].active = YES;
-
-    // Disclosure: triangle button plus a label that toggles as well.
-    NSString *disclosureTip = @"Tells the updater where to find components that show \u201CNo source\u201D in the results.";
-    _disclosure = [[NSButton alloc] initWithFrame:NSZeroRect];
-    _disclosure.bezelStyle = NSBezelStyleDisclosure;
-    [_disclosure setButtonType:NSButtonTypePushOnPushOff];
-    _disclosure.title = @"";
-    _disclosure.target = self;
-    _disclosure.action = @selector(toggleAdvanced:);
-    _disclosure.toolTip = disclosureTip;
-    _disclosure.accessibilityLabel = @"Custom sources";
-    NSTextField *disclosureLabel = [NSTextField labelWithString:@"Custom sources"];
-    disclosureLabel.toolTip = disclosureTip;
-    [disclosureLabel addGestureRecognizer:[[NSClickGestureRecognizer alloc] initWithTarget:self action:@selector(toggleAdvanced:)]];
-    NSStackView *disclosureRow = [NSStackView stackViewWithViews:@[_disclosure, disclosureLabel]];
-    disclosureRow.spacing = 4;
-
-    // Custom sources block, hidden until expanded.
-    NSTextField *caption = [NSTextField labelWithString:@"For components that show \u201CNo source\u201D in the results."];
-    caption.font = [NSFont systemFontOfSize:NSFont.smallSystemFontSize];
-    caption.textColor = NSColor.secondaryLabelColor;
-    NSButton *fieldsHelp = makeHelpButton(self, @selector(showFieldsHelp:), @"How to add a source", @"Custom sources help");
-    NSStackView *captionRow = [NSStackView stackViewWithViews:@[caption, [self spacer], fieldsHelp]];
-    captionRow.translatesAutoresizingMaskIntoConstraints = NO;
-    [captionRow.widthAnchor constraintEqualToConstant:kContentWidth - kIndent].active = YES;
-
-    const CGFloat sourcesWidth = kContentWidth - kIndent;
-    NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, sourcesWidth, 88)];
-    scroll.hasVerticalScroller = YES;
-    scroll.borderType = NSBezelBorder;
-    scroll.translatesAutoresizingMaskIntoConstraints = NO;
-    scroll.toolTip = @"A JSON array of entries. Use the help button for the fields.";
-    [scroll.widthAnchor constraintEqualToConstant:sourcesWidth].active = YES;
-    [scroll.heightAnchor constraintEqualToConstant:88].active = YES;
-    _sources = [[NSTextView alloc] initWithFrame:scroll.bounds];
-    _sources.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
-    _sources.textColor = NSColor.textColor;
-    _sources.backgroundColor = NSColor.textBackgroundColor;
-    _sources.automaticQuoteSubstitutionEnabled = NO;
-    _sources.automaticDashSubstitutionEnabled = NO;
-    _sources.automaticTextReplacementEnabled = NO;
-    _sources.richText = NO;
-    _sources.verticallyResizable = YES;
-    _sources.autoresizingMask = NSViewWidthSizable;
-    _sources.delegate = self;
-    scroll.documentView = _sources;
-
-    _placeholder = [FCUPlaceholderLabel labelWithString:kSourcesPlaceholder];
-    _placeholder.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
-    _placeholder.textColor = NSColor.placeholderTextColor;
-    _placeholder.frame = NSMakeRect(7, 0, sourcesWidth - 14, 32);
-    [_sources addSubview:_placeholder];
-
-    _save = [NSButton buttonWithTitle:@"Save Sources" target:self action:@selector(saveSources:)];
-    _save.toolTip = @"Applies the sources above. Other settings on this page save immediately.";
-    _message = [NSTextField wrappingLabelWithString:@""];
-    _message.preferredMaxLayoutWidth = kContentWidth - kIndent - 230;
-    _message.font = [NSFont systemFontOfSize:NSFont.smallSystemFontSize];
-    _message.lineBreakMode = NSLineBreakByTruncatingTail;
-    _message.maximumNumberOfLines = 2;
-    _insertExample = [NSButton buttonWithTitle:@"Insert Example" target:self action:@selector(insertExample:)];
-    _insertExample.bezelStyle = NSBezelStyleInline;
-    _insertExample.controlSize = NSControlSizeSmall;
-    _insertExample.font = [NSFont systemFontOfSize:NSFont.smallSystemFontSize];
-    _insertExample.toolTip = @"Inserts a GitHub entry to edit";
-    NSStackView *saveRow = [NSStackView stackViewWithViews:@[_save, _insertExample, _message]];
-    saveRow.spacing = 10;
-    saveRow.alignment = NSLayoutAttributeCenterY;
-
-    _advanced = [self vertical:@[captionRow, scroll, saveRow] spacing:6];
-    [_advanced setCustomSpacing:8 afterView:scroll];
-    _advanced.edgeInsets = NSEdgeInsetsMake(0, kIndent, 0, 0);
-    _advanced.hidden = YES;
-
-    _page = [self vertical:@[title, summary, autoRow, lastRow, _prereleases, prereleasesRow, separator, disclosureRow, _advanced] spacing:6];
+    _page = [self vertical:@[title, summary, autoRow, lastRow, _prereleases, prereleasesRow] spacing:6];
     [_page setCustomSpacing:4 afterView:title];
     [_page setCustomSpacing:16 afterView:summary];
     [_page setCustomSpacing:2 afterView:autoRow];
     [_page setCustomSpacing:10 afterView:lastRow];
     [_page setCustomSpacing:2 afterView:_prereleases];
-    [_page setCustomSpacing:16 afterView:prereleasesRow];
-    [_page setCustomSpacing:16 afterView:separator];
-    [_page setCustomSpacing:8 afterView:disclosureRow];
     _page.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_page];
 
@@ -396,51 +237,25 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     ]];
 }
 
-// One fixed frame for the page, set once: the expanded height (Custom sources open, a two
-// line message). The host repositions a page whose frame changes, so expanding or collapsing
-// only hides or shows the section and never touches the frame; the space below the content
-// stays empty when collapsed. The page is pinned to the top of this flipped view. Never ask
-// the host to resize its window (no preferred content size).
+// One fixed frame for the page, set once and pinned to the top of this flipped view.
+// Never ask the host to resize its window (no preferred content size).
 - (void)sizeViewOnce {
-    BOOL wasHidden = _advanced.hidden;
-    _advanced.hidden = NO;
     [self.view layoutSubtreeIfNeeded];
-    CGFloat height = _page.fittingSize.height + 2 * kMargin + 16;
-    _advanced.hidden = wasHidden;
+    CGFloat height = _page.fittingSize.height + 2 * kMargin;
     [self.view setFrameSize:NSMakeSize(kPageWidth, height)];
-    [self.view layoutSubtreeIfNeeded];
-}
-
-- (void)toggleAdvanced:(id)sender {
-    BOOL show = _advanced.hidden;
-    _advanced.hidden = !show;
-    _disclosure.state = show ? NSControlStateValueOn : NSControlStateValueOff;
     [self.view layoutSubtreeIfNeeded];
 }
 
 - (void)showHelp:(NSButton *)sender { FCUShowHelpPopover(sender); }
 
-- (void)showFieldsHelp:(NSButton *)sender { togglePopover(sender, ^{ return makeSourcesHelpView(); }, &_fieldsPopover); }
-
-- (void)insertExample:(id)sender {
-    if (_sources.string.length > 0) return;
-    _sources.string = kRepositoryExample;
-    [self updatePlaceholderAndSave];
-    [self clearMessage];
-}
-
 #ifdef FCU_DEBUG_HOOKS
-// Autotest: the page's top left corner and the view's size, to prove the toggle does not move them.
+// Autotest: the page's top left corner and the view's size.
 - (NSString *)debugGeometry {
     return [NSString stringWithFormat:@"page y=%.0f x=%.0f, view %.0fx%.0f", _page.frame.origin.y, _page.frame.origin.x,
             self.view.frame.size.width, self.view.frame.size.height];
 }
 
 - (NSString *)debugLastCheckText { return _lastCheck.stringValue; }
-
-- (void)debugExpandAdvanced {
-    if (_advanced.hidden) [self toggleAdvanced:nil];
-}
 #endif
 
 #pragma mark - Settings
@@ -471,12 +286,6 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     _days.textColor = on ? NSColor.labelColor : NSColor.disabledControlTextColor;
 }
 
-- (void)updatePlaceholderAndSave {
-    _placeholder.hidden = _sources.string.length > 0;
-    _save.enabled = ![_sources.string isEqualToString:_savedSources];
-    _insertExample.enabled = _sources.string.length == 0;
-}
-
 - (void)loadSettings {
     _autoCheck.state = GetAutomaticCheckEnabled() ? NSControlStateValueOn : NSControlStateValueOff;
     _stepper.integerValue = GetAutomaticCheckIntervalDays();
@@ -484,21 +293,7 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     _interval.integerValue = _stepper.integerValue;
     [self updateIntervalControls];
     _prereleases.state = GetIncludePrereleases() ? NSControlStateValueOn : NSControlStateValueOff;
-    [self showSavedSources];
     [self refreshLastCheck];
-}
-
-// An empty list shows the grey example, not "[]".
-- (void)showSavedSources {
-    auto entries = loadRepositoryMapping();
-    _savedSources = entries.empty() ? @"" : [NSString stringWithUTF8String:fcu::formatUserMappings(entries).c_str()];
-    _sources.string = _savedSources;
-    [self updatePlaceholderAndSave];
-}
-
-- (void)textDidChange:(NSNotification *)notification {
-    [self updatePlaceholderAndSave];
-    [self clearMessage];
 }
 
 - (void)autoCheckChanged:(id)sender {
@@ -562,65 +357,11 @@ NSView *FCUMakeSourcesHelpContentView(void) { return makeSourcesHelpView(); }
     return GetAutomaticCheckIntervalDays();
 }
 
-// Autotest: clicks Insert Example on an empty box; returns the box text, "" when the button was disabled.
-// A second click must do nothing (the box is not empty any more).
-- (NSString *)debugInsertExample:(BOOL *)enabledWhenEmpty enabledWhenFilled:(BOOL *)enabledWhenFilled {
-    _sources.string = @"";
-    [self updatePlaceholderAndSave];
-    *enabledWhenEmpty = _insertExample.enabled;
-    [self insertExample:nil];
-    NSString *text = [_sources.string copy]; // the text view hands out its live backing string
-    *enabledWhenFilled = _insertExample.enabled;
-    _sources.string = @"";
-    [self updatePlaceholderAndSave];
-    return text;
-}
-
 - (NSString *)debugIntervalFieldText { return _interval.stringValue; }
 #endif
 
 - (void)prereleasesChanged:(id)sender {
     SetIncludePrereleases(_prereleases.state == NSControlStateValueOn);
-}
-
-- (BOOL)applySourcesText:(NSString *)text message:(NSString **)message {
-    std::vector<RepositoryMappingEntry> entries;
-    std::string error;
-    if (!fcu::parseUserMappings(text.UTF8String, entries, error)) {
-        if (message) *message = [NSString stringWithUTF8String:error.c_str()];
-        return NO;
-    }
-    saveRepositoryMapping(entries);
-    if (message) *message = @"Saved";
-    return YES;
-}
-
-- (void)clearMessage {
-    ++_messageToken;
-    _message.stringValue = @"";
-    _message.toolTip = nil;
-}
-
-- (void)saveSources:(id)sender {
-    NSString *message = nil;
-    BOOL ok = [self applySourcesText:_sources.string message:&message];
-    NSInteger token = ++_messageToken;
-    if (ok) {
-        [self showSavedSources];
-        _message.textColor = NSColor.secondaryLabelColor;
-        _message.stringValue = @"Saved";
-        _message.toolTip = nil;
-        __weak FCUPreferencesController *weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            FCUPreferencesController *strongSelf = weakSelf;
-            if (strongSelf && strongSelf->_messageToken == token) [strongSelf clearMessage];
-        });
-    } else {
-        NSString *full = [@"Not saved. " stringByAppendingString:message ?: @""];
-        _message.textColor = NSColor.systemRedColor;
-        _message.stringValue = full;
-        _message.toolTip = full;
-    }
 }
 
 - (void)checkNow:(id)sender {

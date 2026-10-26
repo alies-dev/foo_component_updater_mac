@@ -22,7 +22,6 @@ bool find(std::vector<RepositoryMappingEntry> const& entries, std::string const&
 
 char const* originLabel(SourceOrigin origin) {
     switch (origin) {
-    case SourceOrigin::User: return "user";
     case SourceOrigin::InfoPlist: return "Info.plist";
     case SourceOrigin::Registry: return "registry";
     case SourceOrigin::BuiltIn: return "built in list";
@@ -67,11 +66,6 @@ ResolvedSource resolveSource(std::string const& fileName, BundleSource const& bu
     ResolvedSource r;
     std::string name = normalizeComponentName(fileName);
     if (name.empty() || fileName == "Core") return r;
-
-    if (find(lists.user, name, r.entry)) {
-        finish(r, SourceOrigin::User);
-        return r;
-    }
 
     if (bundle.present) {
         std::string error;

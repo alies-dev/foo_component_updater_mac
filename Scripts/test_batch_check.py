@@ -52,27 +52,19 @@ def common(log):
           and iv["type_empty"] == 12 and iv["empty_field_text"] == "12" and iv["type_text"] == 12 and iv["type_12_step_up"] == 13
           and iv["at_30_type_12_up"] == 13 and iv["at_1_type_12_down"] == 11 and iv["at_30_type_junk_up"] == 30, iv)
     snap = log["snapshots"]
-    ie = snap["insert_example"]
-    check("Insert Example is enabled on an empty box, disabled once filled, and inserts a valid entry",
-          ie["enabled_when_empty"] and ie["disabled_when_filled"] and ie["parses"], ie)
-    check("expanding Custom sources moves neither the page nor the view frame",
-          snap["prefs_geometry_collapsed"] == snap["prefs_geometry_expanded"] and snap["prefs_geometry_collapsed"].startswith("page y=20 x=20"), snap)
+    check("preferences page is pinned at the margin", snap["prefs_geometry"].startswith("page y=20 x=20"), snap)
     check("off screen snapshots written",
-          snap["prefs_light"] and snap["prefs_dark"] and snap["prefs_expanded"]
-          and snap["prefs_help_popover"] and snap["prefs_sources_popover"]
+          snap["prefs_light"] and snap["prefs_dark"] and snap["prefs_help_popover"]
           and snap["results_default_rows"] == rw["visible_rows"] and snap["results_core_shown_rows"] == rw["rows"], snap)
-    check("apply: valid sources saved", log["apply"]["valid_accepted"] and log["apply"]["entries_after_valid"] == 1, log["apply"])
-    check("apply: invalid sources rejected, old value kept",
-          log["apply"]["invalid_rejected"] and log["apply"]["invalid_message"] and log["apply"]["entries_after_invalid"] == 1, log["apply"])
     lc = log["last_check_refresh"]
     check("Last check line refreshes when a check completes while the page is open, and not after it closed",
           lc["began"] and lc["refreshed_when_visible"] and lc["not_refreshed_when_hidden"], lc)
-    check("settings written by the run", log["settings_set"] == {"auto_check": True, "interval_days": 11, "include_prereleases": True, "sources": 1}, log["settings_set"])
+    check("settings written by the run", log["settings_set"] == {"auto_check": True, "interval_days": 11, "include_prereleases": True}, log["settings_set"])
 
 
 JL = ["foo_jl_spectrum", "foo_jl_vectorscope", "foo_jl_simplaylist", "foo_jl_scrobble", "foo_jl_wave_seekbar"]
-FRESH = {"auto_check": True, "interval_days": 7, "include_prereleases": False, "sources": 0}
-PERSISTED = {"auto_check": True, "interval_days": 11, "include_prereleases": True, "sources": 1}
+FRESH = {"auto_check": True, "interval_days": 7, "include_prereleases": False}
+PERSISTED = {"auto_check": True, "interval_days": 11, "include_prereleases": True}
 
 
 def jenda_rows(rows):

@@ -20,11 +20,9 @@
 #include "../UI/PreferencesController.h"
 #include "../UI/ResultsWindow.h"
 #include "../UI/DebugSnapshot.h"
-#include "../Core/mapping_validation.h"
 #include "../Core/package_layout.h"
 #include "PeriodicCheck.h"
 #include "../upstream/automatic_check.h"
-#include "../upstream/repository_mapping.h"
 #include "../upstream/update_check.h"
 #include "../Platform/fcu_install.h"
 #include "../upstream/third_party/nlohmann/json.hpp"
@@ -49,7 +47,6 @@ json settingsSnapshot() {
     j["auto_check"] = GetAutomaticCheckEnabled();
     j["interval_days"] = GetAutomaticCheckIntervalDays();
     j["include_prereleases"] = GetIncludePrereleases();
-    j["sources"] = loadRepositoryMapping().size();
     return j;
 }
 
@@ -72,18 +69,10 @@ json registrations() {
     return j;
 }
 
-// Exercises the Apply path of the preferences page without showing it.
+// Exercises the interval field of the preferences page without showing it.
 json applyChecks() {
     FCUPreferencesController *prefs = [[FCUPreferencesController alloc] init];
     (void)prefs.view;
-
-    NSString *message = nil;
-    BOOL validOk = [prefs applySourcesText:@"[{\"dll\": \"foo_autotest\", \"source\": \"github\", \"owner\": \"alies-dev\", \"repo\": \"foo_autotest\"}]" message:&message];
-    size_t afterValid = loadRepositoryMapping().size();
-
-    NSString *error = nil;
-    BOOL invalidOk = [prefs applySourcesText:@"[{\"dll\": \"foo_autotest\", \"source\": \"nowhere\"}]" message:&error];
-    size_t afterInvalid = loadRepositoryMapping().size();
 
     // The interval field: typed text commits when editing ends, invalid text is clamped or reverted,
     // and typed text is not lost to a stepper click.
@@ -107,11 +96,6 @@ json applyChecks() {
 
     json j;
     j["interval"] = interval;
-    j["valid_accepted"] = validOk == YES;
-    j["entries_after_valid"] = afterValid;
-    j["invalid_rejected"] = invalidOk == NO;
-    j["invalid_message"] = error ? error.UTF8String : "";
-    j["entries_after_invalid"] = afterInvalid;
     return j;
 }
 
@@ -142,10 +126,8 @@ json lastCheckRefreshChecks() {
 json snapshots(std::vector<CheckResult> const& results) {
     json j;
     // Render the defaults, whatever earlier runs of the batch left in the profile; restored below.
-    auto savedSources = loadRepositoryMapping();
     int savedDays = GetAutomaticCheckIntervalDays();
     bool savedPre = GetIncludePrereleases(), savedAuto = GetAutomaticCheckEnabled();
-    saveRepositoryMapping({});
     SetAutomaticCheckIntervalDays(7);
     SetIncludePrereleases(false);
     SetAutomaticCheckEnabled(true);
@@ -153,27 +135,14 @@ json snapshots(std::vector<CheckResult> const& results) {
     FCUPreferencesController *prefs = [[FCUPreferencesController alloc] init];
     NSView *view = prefs.view;
     auto path = [&](char const* name) { return [dir stringByAppendingPathComponent:[NSString stringWithUTF8String:name]]; };
-    {
-        BOOL emptyEnabled = NO, filledEnabled = YES;
-        NSString *inserted = [prefs debugInsertExample:&emptyEnabled enabledWhenFilled:&filledEnabled];
-        std::vector<RepositoryMappingEntry> parsed;
-        std::string err;
-        j["insert_example"] = {{"enabled_when_empty", emptyEnabled == YES}, {"disabled_when_filled", filledEnabled == NO},
-                               {"parses", fcu::parseUserMappings(inserted.UTF8String, parsed, err) && parsed.size() == 1 && parsed[0].dllName == "foo_example"}};
-    }
-    j["prefs_geometry_collapsed"] = [prefs debugGeometry].UTF8String;
+    j["prefs_geometry"] = [prefs debugGeometry].UTF8String;
     j["prefs_light"] = DebugWriteSnapshot(view, NSAppearanceNameAqua, path("prefs-light.png"));
     j["prefs_dark"] = DebugWriteSnapshot(view, NSAppearanceNameDarkAqua, path("prefs-dark.png"));
-    [prefs debugExpandAdvanced];
-    j["prefs_geometry_expanded"] = [prefs debugGeometry].UTF8String;
-    j["prefs_expanded"] = DebugWriteSnapshot(view, NSAppearanceNameAqua, path("prefs-expanded.png"));
     j["prefs_help_popover"] = DebugWriteSnapshot(FCUMakeHelpContentView(), NSAppearanceNameAqua, path("prefs-help-popover.png"));
-    j["prefs_sources_popover"] = DebugWriteSnapshot(FCUMakeSourcesHelpContentView(), NSAppearanceNameAqua, path("prefs-sources-popover.png"));
     j["prefs_size"] = {view.frame.size.width, view.frame.size.height};
     j["results_default_rows"] = DebugSnapshotResultsWindow(results, false, path("results-default.png").UTF8String);
     j["results_layout"] = DebugLastResultsLayout();
     j["results_core_shown_rows"] = DebugSnapshotResultsWindow(results, true, path("results-core-shown.png").UTF8String);
-    saveRepositoryMapping(savedSources);
     SetAutomaticCheckIntervalDays(savedDays);
     SetIncludePrereleases(savedPre);
     SetAutomaticCheckEnabled(savedAuto);

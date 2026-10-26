@@ -16,15 +16,11 @@ static RepositoryMappingEntry gh(char const* dll, char const* owner, char const*
 int main() {
     const char* plist = "{\"source\":\"github\",\"owner\":\"plist\",\"repo\":\"p\"}";
     SourceLists lists;
-    lists.user = {gh("foo_a", "user", "u")};
     lists.registry = {gh("foo_a", "registry", "r"), gh("foo_b", "registry", "r"), gh("foo_c", "registry", "r")};
     lists.builtIn = {gh("foo_c", "builtin", "b"), gh("foo_d", "builtin", "b")};
 
     g_context = "order";
     ResolvedSource r = resolveSource("foo_a", {true, plist}, lists);
-    CHECK(r.origin == SourceOrigin::User && r.entry.owner == "user", "user mapping wins over everything");
-    lists.user.clear();
-    r = resolveSource("foo_a", {true, plist}, lists);
     CHECK(r.origin == SourceOrigin::InfoPlist && r.entry.owner == "plist" && r.entry.dllName == "foo_a", "Info.plist before registry");
     r = resolveSource("foo_a", {false, ""}, lists);
     CHECK(r.origin == SourceOrigin::Registry && r.entry.owner == "registry", "registry before the built in list");
@@ -64,7 +60,6 @@ int main() {
         SourceLists bad;
         bad.registry = {gh("foo_r", "o/../x", "r"), {"foo_h", "hyv", "", "", "http://insecure/"}, gh("foo_ok", "me", "repo.name-1_x")};
         bad.builtIn = {gh("foo_b", "me", "a b"), gh("foo_e", "", "")};
-        bad.user = {{"foo_u", "marc2k3", "", "", "javascript:alert(1)"}};
         ResolvedSource q = resolveSource("foo_r", {false, ""}, bad);
         CHECK(q.origin == SourceOrigin::Registry && !q.invalid.empty(), "registry owner with a slash is invalid");
         q = resolveSource("foo_h", {false, ""}, bad);
@@ -73,8 +68,6 @@ int main() {
         CHECK(q.origin == SourceOrigin::BuiltIn && !q.invalid.empty(), "built in repo with a space is invalid");
         q = resolveSource("foo_e", {false, ""}, bad);
         CHECK(q.origin == SourceOrigin::BuiltIn && !q.invalid.empty(), "built in entry without owner and repo is invalid");
-        q = resolveSource("foo_u", {false, ""}, bad);
-        CHECK(q.origin == SourceOrigin::User && !q.invalid.empty(), "user entry with a non https url is invalid");
         bad.registry.push_back({"foo_m1", "github", "attacker", "payload", "https://github.com/trusted/plugin"});
         bad.registry.push_back({"foo_m2", "hyv", "me", "repo", "https://foobar.hyv.fi/?view=foo_m2"});
         q = resolveSource("foo_m1", {false, ""}, bad);
@@ -96,7 +89,6 @@ int main() {
     }
 
     g_context = "labels";
-    CHECK(std::string(originLabel(SourceOrigin::User)) == "user", "user");
     CHECK(std::string(originLabel(SourceOrigin::InfoPlist)) == "Info.plist", "plist");
     CHECK(std::string(originLabel(SourceOrigin::Registry)) == "registry", "registry");
     CHECK(std::string(originLabel(SourceOrigin::BuiltIn)) == "built in list", "built in");
@@ -108,7 +100,6 @@ int main() {
         CHECK(fallsThroughToCatalog(o, Kind::NotFound), originLabel(o));
         CHECK(!fallsThroughToCatalog(o, Kind::Found) && !fallsThroughToCatalog(o, Kind::Incomplete) && !fallsThroughToCatalog(o, Kind::Error), "only a definitive no match falls through");
     }
-    CHECK(!fallsThroughToCatalog(SourceOrigin::User, Kind::NotFound), "user mappings stay final");
     CHECK(!fallsThroughToCatalog(SourceOrigin::Catalog, Kind::NotFound), "the catalog has nothing after it");
 
     g_context = "registry format";

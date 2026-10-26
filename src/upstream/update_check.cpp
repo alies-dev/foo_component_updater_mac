@@ -21,7 +21,7 @@
 //
 // 流れ:
 //   1. componentversion::enumerate() で導入済みコンポーネントを取得(メインスレッド)
-//   2. ソース解決(Core/source_resolution): User mapping, Info.plist, Registry,
+//   2. ソース解決(Core/source_resolution): Info.plist, Registry,
 //      built in list, official catalog の順
 //   3. GitHub は repository ごとに /releases を1回(最大3ページ)、他は upstream の fetcher
 //   4. バージョン比較(compareVersions: update_parse.cpp)
@@ -261,13 +261,10 @@ void RunChecks(
 ) {
     auto say = [&](std::string const& message) { if (progress) progress(message); };
 
-    // Repository Mappingはcfg_stringに保存されているが、cfg_varはメインスレッド
-    // 前提のAPIではないため、ワーカースレッドで読み込んでも問題ない。
     fcu::SourceLists lists;
-    lists.user = loadRepositoryMapping();
 
     // Remote Registry(開発側が管理する既知コンポーネントDB)。
-    // ユーザー登録に無いコンポーネントの補完として使う(DP-0018 Hybrid Registry Model)。
+    // Info.plistに更新元が無いコンポーネントの補完として使う(DP-0018 Hybrid Registry Model)。
     // GitHub上の静的JSONを取得するため、ここでもネットワークI/Oが発生しうる。
     say("Loading the shared registry...");
     RemoteRegistryFetchStatus registryStatus;

@@ -38,14 +38,13 @@ Rules:
 
 Components listed on foobar2000.org with macOS under "Supported system" or "Supported systems" are found by file name without any of the above, from `https://www.foobar2000.org/components/view/<file name>`.
 
-The catalog is also the next step when a GitHub source from the registry, the built in list or `FB2KUpdateSource` has no release with a matching package: the updater then checks the catalog page of the same component. Sources you entered yourself do not fall through.
+The catalog is also the next step when a GitHub source from the registry, the built in list or `FB2KUpdateSource` has no release with a matching package: the updater then checks the catalog page of the same component.
 
 ## Order of lookup
 
 The first match wins:
 
-1. Your own mappings (Preferences, Custom sources, see [custom-sources.md](custom-sources.md)).
-2. The `FB2KUpdateSource` key in the component's `Info.plist` (this page).
-3. The shared registry of p2ashiura (`known_components.json`, refreshed at most once a day).
-4. A short built in list: the `foo_jl_*` components by JendaT and a few other GitHub components (`foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS`, `foo_richtext_mac`).
-5. The official foobar2000.org component catalog, for components that list macOS support. Also used when step 2, 3 or 4 points at GitHub but no release has a matching package.
+1. The `FB2KUpdateSource` key in the component's `Info.plist` (this page).
+2. The shared registry of p2ashiura (`known_components.json`, refreshed at most once a day).
+3. A short built in list: the `foo_jl_*` components by JendaT and a few other GitHub components (`foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS`, `foo_richtext_mac`).
+4. The official foobar2000.org component catalog, for components that list macOS support. Also used when step 1, 2 or 3 points at GitHub but no release has a matching package.
