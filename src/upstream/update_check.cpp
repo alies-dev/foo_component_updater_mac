@@ -4,6 +4,8 @@
 #include "update_check.h"
 #include "../Core/catalog_page.h"
 #include "../Core/github_releases.h"
+#include "../Core/mapping_validation.h"
+#include "../Core/replacement.h"
 #include "../Core/source_resolution.h"
 #include "../Integration/Settings.h"
 #include "../Platform/fcu_http.h"
@@ -137,7 +139,18 @@ fcu::PageFetch FetchGitHubReleasesPage(
 // Notes accumulate so an ignored invalid FB2KUpdateSource stays visible after the
 // check fell through to a later source.
 void AddNote(CheckResult& r, std::string const& text) {
+    if (text.empty()) return;
     r.note = r.note.empty() ? text : r.note + " " + text;
+}
+
+// A replacement row shows the release of the replacement; only a failed lookup stays an error.
+void FinishReplacement(CheckResult& r) {
+    if (r.status == UpdateStatus::Error) {
+        // The error stays first: the window recognizes a rate limit by how the message starts.
+        r.errorMessage += " (while checking " + r.replacedBy + ", which replaces this component)";
+        return;
+    }
+    r.status = UpdateStatus::Replaced;
 }
 
 void ApplyGitHubOutcome(CheckResult& r, fcu::AssetOutcome const& o) {
@@ -243,7 +256,9 @@ std::vector<InstalledComponentInfo> GetInstalledComponents() {
         info.installedVersion = version.c_str();
         info.about = fcu::textPreview(about.c_str());
         if (info.fileName != "Core") {
-            info.hasBundleSource = fcu::readBundleUpdateSource(info.fileName, info.bundleSourceJson);
+            auto keys = fcu::readBundleDictionaries(info.fileName, {"FB2KUpdateSource", "FB2KReplacedBy"});
+            if ((info.hasBundleSource = keys.count("FB2KUpdateSource"))) info.bundleSourceJson = keys["FB2KUpdateSource"];
+            if ((info.hasReplacedBy = keys.count("FB2KReplacedBy"))) info.replacedByJson = keys["FB2KReplacedBy"];
         }
         installed.push_back(std::move(info));
     }
@@ -272,7 +287,11 @@ void RunChecks(
     for (auto const& e : remoteEntries) {
         lists.registry.push_back({e.dllName, e.source, e.owner, e.repo, e.url});
     }
-    fcu::parseRegistryJson(fcu::bundledResource("extra_components", "json"), lists.builtIn);
+    std::string const builtInText = fcu::bundledResource("extra_components", "json");
+    fcu::parseRegistryJson(builtInText, lists.builtIn);
+    std::map<std::string, fcu::Replacement> listedReplacements;
+    std::vector<fcu::ComponentGroup> groups;
+    fcu::parseBuiltInExtras(builtInText, listedReplacements, groups);
 
     // Remote Registry自体の取得に失敗した場合、これまでは完全に見えなかった。
     // 通知レベルの判定(automatic_check.cpp)に使えるよう、結果セットの一部として
@@ -292,8 +311,19 @@ void RunChecks(
         RepositoryMappingEntry entry;
         fcu::SourceOrigin origin;
         bool isCatalog;
+        std::string key;  // asset key: the component's file name, or its replacement's
+        bool replacement; // the row shows the replacement's release (FinishReplacement); never falls through to the catalog
     };
     std::vector<Job> jobs;
+
+    std::map<std::string, std::string> installedVersions; // normalized file name -> version
+    std::vector<std::string> names;
+    for (auto const& comp : installed) {
+        if (comp.fileName == "Core") continue;
+        installedVersions[fcu::normalizeComponentName(comp.fileName)] = comp.installedVersion;
+        names.push_back(comp.fileName);
+    }
+    std::map<std::string, std::string> const overlaps = fcu::overlapNotes(names, groups);
 
     for (auto const& comp : installed) {
         CheckResult r;
@@ -301,9 +331,62 @@ void RunChecks(
         r.displayName = comp.displayName;
         r.installedVersion = comp.installedVersion;
         r.about = comp.about;
+        auto overlap = overlaps.find(fcu::normalizeComponentName(comp.fileName));
+        if (overlap != overlaps.end() && comp.fileName != "Core") r.overlap = overlap->second;
+
+        fcu::ReplacementLookup rl = fcu::findReplacement(comp.fileName, comp.hasReplacedBy, comp.replacedByJson, listedReplacements);
+        if (rl.origin != fcu::ReplacementOrigin::None) {
+            r.replacedBy = rl.replacement.name;
+            r.migration = rl.replacement.migration;
+            r.replacementTeam = rl.replacement.team;
+            r.replacementOrigin = rl.origin == fcu::ReplacementOrigin::InfoPlist ? "Info.plist" : "built in list";
+            r.kept = IsReplacementKept(comp.fileName, r.replacedBy);
+        }
+        if (!r.replacedBy.empty() && !r.kept) {
+            AddNote(r, "Replaced by " + r.replacedBy + (rl.origin == fcu::ReplacementOrigin::InfoPlist
+                ? ", as this component declares." : ", according to the built in list of this updater."));
+            AddNote(r, rl.note);
+            r.status = UpdateStatus::Replaced;
+            auto present = installedVersions.find(fcu::normalizeComponentName(r.replacedBy));
+            if (present != installedVersions.end()) {
+                r.replacementInstalled = true;
+                r.latestVersion = present->second;
+                results.push_back(std::move(r));
+                continue;
+            }
+            // Only the built in list or the declaration itself may say where the successor's code comes from; there is
+            // no identity to compare it with. A name the built in list knows keeps that source, so a declaration cannot
+            // install an impostor under a trusted name. Neither the shared registry nor the catalog is consulted.
+            fcu::SourceLists listed;
+            listed.builtIn = lists.builtIn;
+            fcu::ResolvedSource rs = fcu::resolveSource(r.replacedBy, {}, listed);
+            if (rs.origin != fcu::SourceOrigin::BuiltIn && rl.replacement.hasSource) {
+                rs.origin = rl.origin == fcu::ReplacementOrigin::InfoPlist ? fcu::SourceOrigin::InfoPlist : fcu::SourceOrigin::BuiltIn;
+                rs.entry = rl.replacement.source;
+                rs.invalid.clear();
+            }
+            if (rs.origin == fcu::SourceOrigin::Catalog) {
+                AddNote(r, "No source of " + r.replacedBy + " was declared, so it cannot be installed from here.");
+                results.push_back(std::move(r));
+                continue;
+            }
+            r.sourceOrigin = fcu::originLabel(rs.origin);
+            r.sourceLabel = SourceLabel(rs.entry);
+            if (!rs.invalid.empty()) {
+                AddNote(r, "The source of " + r.replacedBy + " is invalid: " + rs.invalid);
+            } else {
+                r.status = UpdateStatus::Error;
+                r.errorMessage = "Check cancelled.";
+                jobs.push_back({results.size(), rs.entry, rs.origin, false, r.replacedBy, true});
+            }
+            results.push_back(std::move(r));
+            continue;
+        }
+        if (r.kept) AddNote(r, "Replaced by " + r.replacedBy + "; you keep this component.");
 
         fcu::ResolvedSource rs = fcu::resolveSource(comp.fileName, {comp.hasBundleSource, comp.bundleSourceJson}, lists);
-        r.note = rs.note;
+        AddNote(r, rs.note);
+        AddNote(r, rl.note);
         if (rs.origin == fcu::SourceOrigin::None) {
             r.status = UpdateStatus::NoSource;
             if (comp.fileName == "Core") r.note = "Built in to foobar2000.";
@@ -316,7 +399,7 @@ void RunChecks(
                 r.errorMessage = "Invalid source: " + rs.invalid;
             } else {
                 r.errorMessage = "Check cancelled.";
-                jobs.push_back({results.size(), rs.entry, rs.origin, rs.origin == fcu::SourceOrigin::Catalog});
+                jobs.push_back({results.size(), rs.entry, rs.origin, rs.origin == fcu::SourceOrigin::Catalog, comp.fileName, false});
             }
         }
         results.push_back(std::move(r));
@@ -335,7 +418,7 @@ void RunChecks(
         say("Checking " + first.owner + "/" + first.repo + "...");
 
         std::vector<std::string> keys;
-        for (size_t j : group.second) keys.push_back(results[jobs[j].row].dllName);
+        for (size_t j : group.second) keys.push_back(jobs[j].key);
 
         auto outcomes = fcu::resolveRepository(
             keys,
@@ -343,8 +426,8 @@ void RunChecks(
             includePrereleases);
         for (size_t j : group.second) {
             CheckResult& r = results[jobs[j].row];
-            fcu::AssetOutcome const& outcome = outcomes[r.dllName];
-            if (!fcu::fallsThroughToCatalog(jobs[j].origin, outcome.kind)) {
+            fcu::AssetOutcome const& outcome = outcomes[jobs[j].key];
+            if (jobs[j].replacement || !fcu::fallsThroughToCatalog(jobs[j].origin, outcome.kind)) {
                 ApplyGitHubOutcome(r, outcome);
                 continue;
             }
@@ -399,6 +482,9 @@ void RunChecks(
         CheckCatalog(r, abort);
     }
 
+    for (auto const& job : jobs) {
+        if (job.replacement) FinishReplacement(results[job.row]);
+    }
 }
 
 } // namespace
@@ -459,7 +545,7 @@ int DebugChecksBegun() { return g_checksBegun.load(); }
 
 bool HasUpdateAvailable(std::vector<CheckResult> const& results) {
     for (auto const& r : results) {
-        if (r.status == UpdateStatus::UpdateAvailable) return true;
+        if (r.status == UpdateStatus::UpdateAvailable || r.status == UpdateStatus::Replaced) return true;
     }
     return false;
 }

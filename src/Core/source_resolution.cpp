@@ -1,5 +1,6 @@
 #include "source_resolution.h"
 
+#include "list_entry.h"
 #include "mapping_validation.h"
 #include "../upstream/third_party/nlohmann/json.hpp"
 
@@ -38,7 +39,7 @@ bool parseRegistryJson(std::string const& text, std::vector<RepositoryMappingEnt
         if (!parsed.is_object() || !parsed.contains("components") || !parsed["components"].is_array()) return false;
         for (auto const& item : parsed["components"]) {
             RepositoryMappingEntry e;
-            e.dllName = item.value("dll", "");
+            e.dllName = listEntryName(item);
             e.source = item.value("source", "");
             e.owner = item.value("owner", "");
             e.repo = item.value("repo", "");

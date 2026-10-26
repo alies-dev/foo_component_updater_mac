@@ -155,7 +155,8 @@ struct Job {
     }
 
     NSString *installed() const { return bundleIn(userComponentsDir(), name); }
-    NSString *staged() const { return bundleIn(join(work, @"stage"), name); }
+    NSString *staged() const { return stagedAs(name); }
+    NSString *stagedAs(std::string const& n) const { return bundleIn(join(work, @"stage"), n); }
 };
 
 // Calls visit for every entry below root (folders before their content). Whatever fts could not read (a folder
@@ -220,28 +221,31 @@ NSString *bundleId(NSString *bundle) {
     return info[@"CFBundleIdentifier"] ?: @"";
 }
 
-// The candidate must be validly signed (ad hoc is fine) and be the same product as the installed bundle: same bundle
-// identifier and, when the installed one has a Team ID, a signature that chains to Apple with that Team ID.
-void verifyIdentity(NSString *candidate, NSString *installed) {
+// The candidate must be validly signed (ad hoc is fine) and, when `team` is set, chain to Apple with that Team ID;
+// `mismatch` is the message when it does not.
+void verifySignature(NSString *candidate, NSString *team, std::string const& mismatch) {
     id code = staticCode(candidate);
-    NSString *team = teamId(staticCode(installed));
     SecRequirementRef requirement = nullptr;
     if (team.length != 0) {
         // The Team ID field alone is not proof: an ad hoc signature can carry any string there. The requirement ties it to Apple's certificate chain.
-        require([team rangeOfString:@"^[A-Z0-9]{10}$" options:NSRegularExpressionSearch].location != NSNotFound, "The installed component has an unusual Team ID.");
+        require([team rangeOfString:@"^[A-Z0-9]{10}$" options:NSRegularExpressionSearch].location != NSNotFound, "The expected Team ID is unusual.");
         NSString *text = [NSString stringWithFormat:@"anchor apple generic and certificate leaf[subject.OU] = \"%@\"", team];
         require(SecRequirementCreateWithString((__bridge CFStringRef)text, kSecCSDefaultFlags, &requirement) == errSecSuccess, "Could not build the signature requirement.");
     }
     id holder = CFBridgingRelease(requirement);
     OSStatus status = SecStaticCodeCheckValidity((__bridge SecStaticCodeRef)code,
         kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode, (__bridge SecRequirementRef)holder);
-    if (status == errSecCSReqFailed) {
-        throw std::runtime_error(std::string("The new version is signed by a different developer than the installed one (Team ID ") + team.UTF8String + ").");
-    }
+    if (status == errSecCSReqFailed) throw std::runtime_error(mismatch);
     if (status != errSecSuccess) {
         NSString *why = CFBridgingRelease(SecCopyErrorMessageString(status, nullptr));
         throw std::runtime_error(std::string("The code signature of the new version is not valid (") + (why ? why.UTF8String : "unknown error") + ").");
     }
+}
+
+// Same product as the installed bundle: same bundle identifier and, when the installed one has a Team ID, that Team ID.
+void verifyIdentity(NSString *candidate, NSString *installed) {
+    NSString *team = teamId(staticCode(installed));
+    verifySignature(candidate, team, std::string("The new version is signed by a different developer than the installed one (Team ID ") + team.UTF8String + ").");
     require([bundleId(candidate) isEqualToString:bundleId(installed)], "The new version has a different bundle identifier than the installed one.");
 }
 
@@ -343,35 +347,105 @@ InstallOutcome guarded(F const& body) {
     return out;
 }
 
+// Downloads the package at `url` and moves its mac/<name>.component to job.stagedAs(name), after the layout check.
+void extractPackage(Job const& job, std::string const& name, std::string const& url, abort_callback& abort) {
+    NSString *zip = join(job.work, @"package.zip");
+    try {
+        httpDownload(url, zip.fileSystemRepresentation, kMaxDownloadBytes, abort);
+    } catch (std::runtime_error const& e) {
+        throw std::runtime_error(std::string("The download failed: ") + e.what());
+    }
+
+    NSData *bytes = [NSData dataWithContentsOfFile:zip options:NSDataReadingMappedAlways error:nil];
+    require(bytes != nil, "Could not read the download.");
+    PackageCheck check = checkPackageLayout(std::string_view(static_cast<char const *>(bytes.bytes), bytes.length), name);
+    if (!check.ok) throw std::runtime_error(check.error);
+
+    NSString *extracted = join(job.work, @"x");
+    // Without --norsrc and --noextattr ditto turns AppleDouble entries (__MACOSX/._x) into resource forks and attributes, which the
+    // size watchdog does not see; as plain files they are counted. A bundle needs neither: its signature lives in files.
+    run({"/usr/bin/ditto", "-x", "-k", "--noqtn", "--norsrc", "--noextattr", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort,
+        "Could not extract the package.", extracted);
+    requireOnlyListed(extracted, check.entries);
+    // A zip can hold links: both levels must be real folders before anything is moved out of them.
+    NSString *source = join(join(extracted, @"mac"), ns(name + ".component"));
+    if (!isRealDirectory(join(extracted, @"mac")) || !isRealDirectory(source)) throw std::runtime_error("The package does not hold a plain mac/" + name + ".component folder.");
+    makeDirectory(job.stagedAs(name).stringByDeletingLastPathComponent);
+    require(rename(source.fileSystemRepresentation, job.stagedAs(name).fileSystemRepresentation) == 0, "Could not prepare the new version.");
+}
+
 } // namespace
 
 InstallOutcome installUpdate(std::string const& name, std::string const& installedVersion, std::string const& url, abort_callback& abort) {
     return guarded([&] {
         Job job(name);
-        NSString *zip = join(job.work, @"package.zip");
-        try {
-            httpDownload(url, zip.fileSystemRepresentation, kMaxDownloadBytes, abort);
-        } catch (std::runtime_error const& e) {
-            throw std::runtime_error(std::string("The download failed: ") + e.what());
+        extractPackage(job, name, url, abort);
+        finish(job, installedVersion, abort);
+    });
+}
+
+InstallOutcome switchComponent(std::string const& name, std::string const& replacement, std::string const& url, std::string const& team,
+                                abort_callback& abort) {
+    return guarded([&] {
+        require(validName(replacement) && replacement != name, "Invalid replacement name.");
+        Job job(name);
+        NSString *pending = join(userComponentsDir(), @"pending");
+        makeDirectory(pending);
+        NSString *newTarget = join(pending, ns(replacement)), *oldTarget = join(pending, ns(name));
+        struct stat st;
+        // Switching to a component that goes at the next start would remove both.
+        require(!isRemovalStaged(replacement), "The replacement is waiting to be removed; restart foobar2000 first.");
+        // The caller decides (the check knows what foobar2000 loaded): no url means the successor is installed or
+        // staged already and only the removal is left; otherwise its package is downloaded and staged.
+        bool const stageNew = !url.empty();
+        if (!stageNew) {
+            require(isDirectory(bundleIn(userComponentsDir(), replacement)) || isStaged(replacement), "The replacement offers no package to install.");
+        } else {
+            require(lstat(newTarget.fileSystemRepresentation, &st) != 0, "foobar2000 has a pending change for the replacement; restart foobar2000 first.");
+            // On disk but not loaded (the check found no such component): staging would replace it without a backup.
+            require(lstat(join(userComponentsDir(), ns(replacement)).fileSystemRepresentation, &st) != 0,
+                    "A folder for the replacement exists but foobar2000 did not load it; remove it first.");
+            extractPackage(job, replacement, url, abort);
+            sanitize(job.stagedAs(replacement));
+            // A different product, so no bundle identifier to compare. The developer is pinned: the declared Team ID, or else the
+            // old component's own when it has one, so a Developer ID component never hands over to code its developer did not sign.
+            NSString *expected = !team.empty() ? ns(team) : teamId(staticCode(job.installed()));
+            verifySignature(job.stagedAs(replacement), expected,
+                            "The replacement is not signed by the developer the switch requires (Team ID " + std::string(expected.UTF8String) + ").");
+            require(bundleId(job.stagedAs(replacement)).length != 0, "The replacement has no bundle identifier.");
         }
 
-        NSData *bytes = [NSData dataWithContentsOfFile:zip options:NSDataReadingMappedAlways error:nil];
-        require(bytes != nil, "Could not read the download.");
-        PackageCheck check = checkPackageLayout(std::string_view(static_cast<char const *>(bytes.bytes), bytes.length), name);
-        if (!check.ok) throw std::runtime_error(check.error);
-
-        NSString *extracted = join(job.work, @"x");
-        // Without --norsrc and --noextattr ditto turns AppleDouble entries (__MACOSX/._x) into resource forks and attributes, which the
-        // size watchdog does not see; as plain files they are counted. A bundle needs neither: its signature lives in files.
-        run({"/usr/bin/ditto", "-x", "-k", "--noqtn", "--norsrc", "--noextattr", zip.fileSystemRepresentation, extracted.fileSystemRepresentation}, abort,
-            "Could not extract the package.", extracted);
-        requireOnlyListed(extracted, check.entries);
-        // A zip can hold links: both levels must be real folders before anything is moved out of them.
-        NSString *source = join(join(extracted, @"mac"), ns(name + ".component"));
-        if (!isRealDirectory(join(extracted, @"mac")) || !isRealDirectory(source)) throw std::runtime_error("The package does not hold a plain mac/" + name + ".component folder.");
-        makeDirectory(job.staged().stringByDeletingLastPathComponent);
-        require(rename(source.fileSystemRepresentation, job.staged().fileSystemRepresentation) == 0, "Could not prepare the new version.");
-        finish(job, installedVersion, abort);
+        // The removal marker is an empty file; written in the work folder and renamed, like the staged folder.
+        NSString *marker = join(job.work, @"removal-marker");
+        require([[NSData data] writeToFile:marker atomically:NO], "Could not stage the removal.");
+        // A staged update of the component being removed moves aside, so a failure below can put it back.
+        NSString *aside = join(rootDir(), ns("previous-pending-" + name));
+        bool const hadPending = lstat(oldTarget.fileSystemRepresentation, &st) == 0;
+        if (hadPending) {
+            if (lstat(aside.fileSystemRepresentation, &st) == 0) {
+                throw std::runtime_error(std::string("An earlier pending entry was left at ") + aside.fileSystemRepresentation + "; move it away first.");
+            }
+            require(rename(oldTarget.fileSystemRepresentation, aside.fileSystemRepresentation) == 0, "Could not stage the removal.");
+        }
+        auto putBack = [&](std::string const& why) {
+            if (hadPending && rename(aside.fileSystemRepresentation, oldTarget.fileSystemRepresentation) != 0) {
+                throw std::runtime_error(why + " The previous pending entry could not be put back and was left at " + aside.fileSystemRepresentation + ".");
+            }
+            throw std::runtime_error(why);
+        };
+        NSString *stagedFolder = job.stagedAs(replacement).stringByDeletingLastPathComponent;
+        if (stageNew && rename(stagedFolder.fileSystemRepresentation, newTarget.fileSystemRepresentation) != 0) {
+            putBack("Could not stage the replacement.");
+        }
+        if (rename(marker.fileSystemRepresentation, oldTarget.fileSystemRepresentation) != 0) {
+            // The replacement leaves pending/ in one rename, so a restart never loads both.
+            std::string why = "Could not stage the removal.";
+            if (stageNew && rename(newTarget.fileSystemRepresentation, stagedFolder.fileSystemRepresentation) != 0) {
+                why += std::string(" The replacement could not be taken back; delete ") + newTarget.fileSystemRepresentation + " before restarting foobar2000.";
+            }
+            putBack(why);
+        }
+        if (hadPending) [fm() removeItemAtPath:aside error:nil];
     });
 }
 
@@ -388,6 +462,11 @@ InstallOutcome restorePrevious(std::string const& name, std::string const& insta
 
 bool isStaged(std::string const& name) {
     return validName(name) && isDirectory(bundleIn(join(userComponentsDir(), @"pending"), name));
+}
+
+bool isRemovalStaged(std::string const& name) {
+    struct stat st;
+    return validName(name) && lstat(join(join(userComponentsDir(), @"pending"), ns(name)).fileSystemRepresentation, &st) == 0 && S_ISREG(st.st_mode);
 }
 
 bool backupVersion(std::string const& name, std::string& version) {

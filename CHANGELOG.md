@@ -4,6 +4,11 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+* "Replaced" status: when a component declares its successor (`FB2KReplacedBy` in its `Info.plist`, or the built in list), tick the row and click Install to switch: the successor is installed and the old component removed at the next start. A migration notes link the author provides is shown before the switch and offered once after it. Right click > Keep keeps the old one.
+* A warning when two installed components do the same job, for now the Last.fm scrobblers (foo_jl_scrobble, foo_mac_scrobble, foo_lastfm, foo_scrobbler_mac).
+
 ### Changed
 
 * Preferences explain "Include prereleases" under the checkbox.

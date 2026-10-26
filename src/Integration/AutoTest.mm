@@ -15,6 +15,7 @@
 
 #include "../fb2k_sdk.h"
 #include "ComponentIds.h"
+#include "MigrationNotes.h"
 #include "Settings.h"
 #include "../Platform/fcu_http.h"
 #include "../UI/PreferencesController.h"
@@ -38,6 +39,7 @@ const char* statusName(UpdateStatus s) {
     case UpdateStatus::ComparisonUnsupported: return "unable_to_compare";
     case UpdateStatus::Error: return "error";
     case UpdateStatus::NoSource: return "no_source";
+    case UpdateStatus::Replaced: return "replaced";
     }
     return "";
 }
@@ -357,7 +359,7 @@ void writeLog(std::string const& path, json const& log) {
 
 json stateOf(std::string const& name, std::string* version = nullptr) {
     std::string backup;
-    json j = {{"pid", getpid()}, {"installed_version", ""}, {"staged", fcu::isStaged(name)}};
+    json j = {{"pid", getpid()}, {"installed_version", ""}, {"staged", fcu::isStaged(name)}, {"removal_staged", fcu::isRemovalStaged(name)}};
     j["backup_version"] = fcu::backupVersion(name, backup) ? backup : "";
     for (auto const& c : GetInstalledComponents()) {
         if (c.fileName != name) continue;
@@ -370,13 +372,15 @@ json stateOf(std::string const& name, std::string* version = nullptr) {
 // The install scenarios of `test_batch.sh m2`, one foobar2000 run each (config key foo_component_updater_mac.debug.m2).
 // Packages come from the stub (/pkg/<name>). install, restore, self-install and self-restore end in main_restart(): they set
 // the scenario of the next run and its log path (this one with the scenario name swapped) before restarting. The self-*
-// scenarios work on this component itself, the others on foo_abx.
+// scenarios work on this component itself, the others on foo_abx; switch replaces foo_abx with foo_abx_ng.
 void runInstallScenario(std::string const& path, std::string const& scenario) {
     auto log = std::make_shared<json>();
     auto version = std::make_shared<std::string>();
     (*log)["scenario"] = scenario;
     std::string const name = scenario.rfind("self-", 0) == 0 ? "foo_component_updater_mac" : "foo_abx";
     (*log)["before"] = stateOf(name, version.get());
+    bool const switching = scenario.rfind("switch", 0) == 0;
+    if (switching) (*log)["replacement_before"] = stateOf("foo_abx_ng");
     auto installed = GetInstalledComponents();
     auto results = std::make_shared<std::vector<CheckResult>>();
 
@@ -416,10 +420,67 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
         } else if (scenario == "team") {
             attempt("other_developer", pkg("good"));
             attempt("forged_team", pkg("forgedteam"));
+            // A Developer ID component that declares no Team ID for its successor hands over only to its own developer.
+            fcu::InstallOutcome o = fcu::switchComponent(name, "foo_abx_ng", pkg("foo_abx_ng"), "", abort);
+            (*log)["outcomes"]["switch_other_developer"] = {{"ok", o.ok}, {"message", o.message}};
             attempt("same_developer", pkg("devid"));
+        } else if (scenario == "switch") {
+            auto rowOf = [&](std::vector<CheckResult> const& all) {
+                for (auto const& r : all) {
+                    if (r.dllName == "foo_abx") return r;
+                }
+                return CheckResult{};
+            };
+            auto describe = [](CheckResult const& r) {
+                return json{{"status", statusName(r.status)}, {"replaced_by", r.replacedBy}, {"origin", r.replacementOrigin}, {"kept", r.kept},
+                            {"latest", r.latestVersion}, {"source", r.sourceLabel}, {"asset", r.assetName}, {"note", r.note},
+                            {"migration", r.migration}};
+            };
+            // Kept: the row is checked as usual (the catalog has foo_abx 2.2.3) and says what it keeps.
+            SetReplacementKept("foo_abx", "foo_abx_ng", true);
+            (*log)["kept_row"] = describe(rowOf(RunUpdateCheck(installed, abort)));
+            SetReplacementKept("foo_abx", "foo_abx_ng", false);
+            *results = RunUpdateCheck(installed, abort);
+            CheckResult const r = rowOf(*results);
+            (*log)["row"] = describe(r);
+            (*log)["row"]["block_reason"] = fcu::installBlockReason(true, r.dllName, r.downloadUrl, r.assetName, false);
+            // The window before the switch, plus a row that shares its job with another installed component. The
+            // worker waits, so the snapshot shows the replaced row and not the staged one.
+            dispatch_semaphore_t rendered = dispatch_semaphore_create(0);
+            fb2k::inMainThread([=] {
+                std::vector<CheckResult> shown = *results;
+                CheckResult overlap;
+                overlap.dllName = "foo_lastfm";
+                overlap.displayName = "Last.fm Scrobbler";
+                overlap.installedVersion = overlap.latestVersion = "1.0.22";
+                overlap.status = UpdateStatus::UpToDate;
+                overlap.overlap = "Same job as foo_jl_scrobble (Last.fm scrobbler). Keep only one.";
+                shown.push_back(overlap);
+                (*log)["snapshot_rows"] = DebugSnapshotResultsWindow(shown, false, "/tmp/fcu-ui/results-switch.png");
+                (*log)["switch_confirmation"] = DebugSnapshotSwitchConfirmation(*results, "/tmp/fcu-ui/switch-confirmation.png");
+                dispatch_semaphore_signal(rendered);
+            });
+            dispatch_semaphore_wait(rendered, DISPATCH_TIME_FOREVER);
+            fcu::InstallOutcome o = fcu::switchComponent("foo_abx", r.replacedBy, r.downloadUrl, r.replacementTeam, abort);
+            (*log)["outcomes"]["switch"] = {{"ok", o.ok}, {"message", o.message}};
+            // As the results window does once the switch is staged.
+            if (o.ok && !r.migration.empty()) RememberMigrationNote({"foo_abx", r.replacedBy, r.migration});
+            next = "switch-after";
         }
         fb2k::inMainThread([=] {
             (*log)["after"] = stateOf(name);
+            if (switching) (*log)["replacement_after"] = stateOf("foo_abx_ng");
+            if (scenario == "switch-after") {
+                // The note stays until it was offered (a quit before that keeps it), then it is gone.
+                json notes = json::array();
+                std::vector<MigrationNote> const applied = AppliedMigrationNotes();
+                for (auto const& n : applied) notes.push_back({{"from", n.from}, {"to", n.to}, {"url", n.url}});
+                (*log)["migration_notes"] = notes;
+                (*log)["migration_alert"] = applied.empty() ? "" : DebugSnapshotMigrationAlert(applied[0], "/tmp/fcu-ui/migration-alert.png");
+                (*log)["migration_notes_kept_until_offered"] = AppliedMigrationNotes().size();
+                for (auto const& n : applied) ForgetMigrationNote(n);
+                (*log)["migration_notes_again"] = AppliedMigrationNotes().size();
+            }
             if (scenario == "refuse") {
                 bool withBackup = false, without = true;
                 std::string title = DebugRestoreMenuItem(*results, "foo_abx", &withBackup);

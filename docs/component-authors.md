@@ -48,3 +48,31 @@ The first match wins:
 2. The shared registry of p2ashiura (`known_components.json`, refreshed at most once a day).
 3. A short built in list: the `foo_jl_*` components by JendaT and a few other GitHub components (`foo_mac_scrobble`, `foo_vis_projectm_mac`, `foo_cyan_leaf`, `foo_vis_projectMacOS`, `foo_richtext_mac`).
 4. The official foobar2000.org component catalog, for components that list macOS support. Also used when step 1, 2 or 3 points at GitHub but no release has a matching package.
+
+## Point users to a successor: `FB2KReplacedBy`
+
+When your component is superseded (renamed, merged into another one, taken over by a fork), ship one last release whose `Info.plist` names the successor:
+
+```xml
+<key>FB2KReplacedBy</key>
+<dict>
+    <key>component</key><string>foo_example_ng</string>
+    <key>source</key><string>github</string>
+    <key>owner</key><string>new-owner</string>
+    <key>repo</key><string>foo_example_ng</string>
+    <key>migration_url</key><string>https://github.com/new-owner/foo_example_ng#migrating</string>
+</dict>
+```
+
+Rules:
+
+* `component` is required: the successor's file name (letters, digits, `.`, `_`, `-`, `+`), not your own.
+* `source`, `owner`, `repo` and `url` say where the successor's releases live and follow the `FB2KUpdateSource` rules above. Declare them: the successor is never looked up in the shared registry or the foobar2000.org catalog, because a list run by someone else must not decide which code your declaration installs. Only a successor that the updater's built in list knows can go without them; when the list knows it, the list's source is used even if you declare another one.
+* `migration_url` is optional: an `https://` page (printable ASCII, no user name before the host) that tells users what to set up again, such as logging in once more. The confirmation shows it as a link, and after the restart that completes the switch foobar2000 offers it once. It opens only when the user clicks it.
+* `team` is optional: the successor's Team ID (10 capital letters or digits). If your component is signed with a Developer ID, the successor must be signed by the same team unless `team` names another one. Ad hoc signed components have nothing to pin.
+* No other keys are allowed. It is a separate key on purpose: `FB2KUpdateSource` accepts no other keys, and older versions of the updater would drop the whole update source.
+* Once a user has that release, the results window shows the row as "Replaced" with the successor's version. Ticking it and clicking Install downloads the successor (same package rules as above, a valid signature and a bundle identifier) and removes your component at the next start of foobar2000. Users can keep yours instead (right click > Keep).
+* Settings are not carried over; the successor has its own.
+* An invalid key is ignored and the row tooltip says "Invalid FB2KReplacedBy".
+
+The updater's built in list can declare the same for components whose author no longer ships releases (`"replaced_by"` with the same fields).

@@ -11,15 +11,17 @@ namespace {
 
 bool isIdentifier(std::string const& s) {
     if (s.empty() || s.size() > 128) return false;
-    for (char c : s) {
-        unsigned char u = static_cast<unsigned char>(c);
-        if (!(std::isalnum(u) || c == '.' || c == '_' || c == '-')) return false;
-    }
-    return true;
+    return std::all_of(s.begin(), s.end(), [](char c) { return isAsciiAlnum(c) || c == '.' || c == '_' || c == '-'; });
 }
 
 bool isUrlSource(std::string const& source) {
     return source == "marc2k3" || source == "sourceforge" || source == "hyv";
+}
+
+} // namespace
+
+bool isAsciiAlnum(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
 }
 
 bool isHttpsUrl(std::string const& url) {
@@ -28,6 +30,8 @@ bool isHttpsUrl(std::string const& url) {
     return std::none_of(url.begin(), url.end(), [](unsigned char c) { return c <= 0x20 || c == 0x7f; })
         && url[prefix.size()] != '/';
 }
+
+namespace {
 
 bool readString(nlohmann::json const& obj, char const* key, std::string& out, std::string& error) {
     auto it = obj.find(key);
@@ -104,24 +108,27 @@ bool isSupportedSource(std::string const& s) {
     return s == "github" || s == "gitlab" || s == "codeberg" || isUrlSource(s);
 }
 
-bool parseBundleSource(std::string const& dllName, std::string const& json,
-                       RepositoryMappingEntry& out, std::string& error) {
+bool parseSourceDictionary(std::string const& dllName, std::string const& json,
+                           RepositoryMappingEntry& out, std::string& error) {
     nlohmann::json parsed;
     try {
         parsed = nlohmann::json::parse(json);
     } catch (std::exception const& e) {
-        error = std::string("Invalid FB2KUpdateSource: ") + e.what();
+        error = e.what();
         return false;
     }
     RepositoryMappingEntry e;
     e.dllName = normalizeComponentName(dllName);
-    std::string entryError;
-    if (!parseEntry(parsed, e, entryError)) {
-        error = "Invalid FB2KUpdateSource: " + entryError;
-        return false;
-    }
+    if (!parseEntry(parsed, e, error)) return false;
     out = std::move(e);
     return true;
+}
+
+bool parseBundleSource(std::string const& dllName, std::string const& json,
+                       RepositoryMappingEntry& out, std::string& error) {
+    if (parseSourceDictionary(dllName, json, out, error)) return true;
+    error = "Invalid FB2KUpdateSource: " + error;
+    return false;
 }
 
 } // namespace fcu

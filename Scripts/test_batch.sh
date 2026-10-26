@@ -22,7 +22,10 @@
 #   m2-refuse    the old version runs again, the backup holds the new one; nine bad packages are refused
 #   m2-bomb      two packages whose declared sizes pass but which hold 3000 MB (plain, and as an AppleDouble resource fork): ditto is killed, nothing is staged
 #   m2-self-*    the component installs its own update (9.9.9), restarts into it, restores its own backup and restarts again
-#   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
+#   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged, and a
+#                switch to an ad hoc successor is refused (no declared Team ID: the old one's applies)
+#   m2-switch    foo_abx declares FB2KReplacedBy foo_abx_ng: a kept row is checked as usual, the switch stages foo_abx_ng and
+#                removes foo_abx; after the restart only foo_abx_ng is installed and its migration notes are offered once
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
 # (verified with diff -rq); foobar2000 is started only with `open -g -a foobar2000`,
@@ -319,6 +322,10 @@ m2_packages() {
     cp "$WORK/foo_abx.zip" "$pk/devid.fb2k-component"
     ditto "$WORK/orig" "$WORK/good" && codesign --force --sign - "$WORK/good/mac/foo_abx.component" >/dev/null 2>&1 || return 1
     ditto "$WORK/good" "$WORK/tampered" && ditto "$WORK/good" "$WORK/wrongid" || return 1
+    # The replacement: the same binary in a bundle of another name and bundle identifier.
+    mkdir -p "$WORK/abxng/mac" && ditto "$WORK/good/mac/foo_abx.component" "$WORK/abxng/mac/foo_abx_ng.component" || return 1
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.foo-abx-ng" "$WORK/abxng/mac/foo_abx_ng.component/Contents/Info.plist"
+    codesign --force --sign - "$WORK/abxng/mac/foo_abx_ng.component" >/dev/null 2>&1 && (cd "$WORK/abxng" && zip -qry "$pk/foo_abx_ng.fb2k-component" mac) || return 1
     python3 - "$WORK/tampered/mac/foo_abx.component/Contents/MacOS/foo_abx" <<'PY'
 import sys
 d = open(sys.argv[1], "rb").read()
@@ -537,6 +544,37 @@ run_m2() {
             say "PASS m2 team: the staged bundle is the Developer ID package, verifies, has no quarantine; the installed bundle is untouched"
         else
             fail "m2 team: staged bundle is not as expected"
+        fi
+    fi
+    quit_or_stop m2
+
+    # switch: the ad hoc foo_abx with an FB2KReplacedBy key, nothing pending (the team run staged foo_abx).
+    rm -rf "$PROFILE/user-components/pending/foo_abx" "$PROFILE/user-components/foo_abx/foo_abx.component"
+    cp -R "$WORK/good/mac/foo_abx.component" "$PROFILE/user-components/foo_abx/"
+    /usr/libexec/PlistBuddy -c "Add :FB2KReplacedBy dict" -c "Add :FB2KReplacedBy:component string foo_abx_ng" -c "Add :FB2KReplacedBy:source string github" \
+        -c "Add :FB2KReplacedBy:owner string fcu-test" -c "Add :FB2KReplacedBy:repo string foo_abx_ng" \
+        -c "Add :FB2KReplacedBy:migration_url string https://github.com/fcu-test/foo_abx_ng#migrating" "$installed/Contents/Info.plist"
+    codesign --force --sign - "$installed" >/dev/null 2>&1 || { fail "codesign foo_abx with FB2KReplacedBy"; exit 1; }
+    mkdir -p /tmp/fcu-ui
+    BATCH_PID=""
+    if m2_start switch; then
+        check_run m2-switch
+        [ -f "$PROFILE/user-components/pending/foo_abx" ] && [ ! -s "$PROFILE/user-components/pending/foo_abx" ] \
+            && [ -d "$PROFILE/user-components/pending/foo_abx_ng/foo_abx_ng.component" ] \
+            && say "PASS m2 switch: pending/foo_abx is an empty removal marker, pending/foo_abx_ng holds the replacement" \
+            || fail "m2 switch: pending is not as expected: $(ls -la "$PROFILE/user-components/pending" 2>&1)"
+        previous="$BATCH_PID"
+        if m2_wait switch-after; then
+            check_run m2-switch-after "$previous"
+            m2_disk switch-after ""
+            # The bundle keeps its executable name (foo_abx), so m2_disk's path does not apply.
+            local ng="foo_abx_ng.component/Contents/MacOS/foo_abx"
+            [ "$(sha "$PROFILE/user-components/foo_abx_ng/$ng")" = "$(sha "$WORK/abxng/mac/$ng")" ] && grep -q "foo_abx_ng/$ng" "$WORK/lsof-switch-after.txt" \
+                && say "PASS m2 switch-after: the process maps the replacement's binary from user-components/foo_abx_ng" \
+                || fail "m2 switch-after: the replacement binary is not installed or not mapped"
+            [ ! -e "$PROFILE/user-components/foo_abx" ] && [ -z "$(ls "$PROFILE/user-components/pending" 2>/dev/null)" ] \
+                && say "PASS m2 switch-after: user-components/foo_abx is gone and nothing is pending" \
+                || fail "m2 switch-after: foo_abx or pending entries remain: $(ls "$PROFILE/user-components" "$PROFILE/user-components/pending" 2>&1)"
         fi
     fi
     quit_or_stop m2

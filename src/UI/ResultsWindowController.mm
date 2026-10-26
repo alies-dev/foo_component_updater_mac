@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "../Integration/MigrationNotes.h"
 #include "../Integration/Settings.h"
 #include "../upstream/automatic_check.h"
 #include "DebugSnapshot.h"
@@ -15,6 +16,17 @@ NSNotificationName const FCUUpdateCheckCompletedNotification = @"FCUUpdateCheckC
 namespace {
 
 NSString *ns(std::string const& s) { return [NSString stringWithUTF8String:s.c_str()] ?: @""; }
+
+// Text from a remote source in a dialog that asks for consent: printable ASCII only (no line or direction
+// controls that could fake a line), cut at `limit` characters.
+NSString *plain(std::string const& s, size_t limit = 40) {
+    std::string out;
+    for (char c : s) {
+        if (c >= 0x20 && c < 0x7f) out += c;
+    }
+    if (out.size() > limit) out = out.substr(0, limit) + "...";
+    return ns(out);
+}
 
 NSDate *releasedDate(std::string const& iso) {
     static NSISO8601DateFormatter *parser = [NSISO8601DateFormatter new];
@@ -36,12 +48,13 @@ NSString *releasedText(std::string const& iso) {
 int statusRank(UpdateStatus s) {
     switch (s) {
     case UpdateStatus::UpdateAvailable: return 0;
-    case UpdateStatus::Error: return 1;
-    case UpdateStatus::ComparisonUnsupported: return 2;
-    case UpdateStatus::UpToDate: return 3;
-    case UpdateStatus::NoSource: return 4;
+    case UpdateStatus::Replaced: return 1;
+    case UpdateStatus::Error: return 2;
+    case UpdateStatus::ComparisonUnsupported: return 3;
+    case UpdateStatus::UpToDate: return 4;
+    case UpdateStatus::NoSource: return 5;
     }
-    return 5;
+    return 6;
 }
 
 NSString *statusText(UpdateStatus s) {
@@ -51,8 +64,14 @@ NSString *statusText(UpdateStatus s) {
     case UpdateStatus::ComparisonUnsupported: return @"Unable to compare";
     case UpdateStatus::Error: return @"Error";
     case UpdateStatus::NoSource: return @"No source";
+    case UpdateStatus::Replaced: return @"Replaced";
     }
     return @"";
+}
+
+// The successor of a Replaced row is installed, or staged by an earlier switch or by foobar2000: switching only removes.
+bool successorPresent(CheckResult const& r) {
+    return r.replacementInstalled || fcu::isStaged(r.replacedBy);
 }
 
 }
@@ -63,8 +82,9 @@ NSString *statusText(UpdateStatus s) {
 @property (copy) NSDate *releasedDate; // nil when unknown; sort key of the Released column
 @property NSInteger statusOrder;       // statusRank; sort key of the Status column
 @property (copy) NSString *name, *blockReason, *backupVersion; // file name, why not installable ("" when it is), backup version ("" when none)
+@property (copy) NSString *replacedBy, *overlap; // see CheckResult; "" when none
 @property UpdateStatus statusCode;
-@property BOOL staged, failed;
+@property BOOL staged, failed, replacementInstalled, kept;
 @end
 @implementation FCUResultRow
 @end
@@ -111,7 +131,9 @@ int64_t g_dismissedCheckId = 0;
 bool g_installing = false; // an install or restore runs; it holds the update check slot
 
 struct Operation {
-    std::string name, installedVersion, url; // url empty: restore the backup
+    std::string name, installedVersion, url; // url empty: restore the backup (unless replacement is set)
+    std::string replacement;                 // set: switch to that component (url may be empty when it is installed)
+    std::string team, migration;             // of a switch: declared Team ID and migration notes page, "" when none
 };
 
 // Main thread, once the worker is done. The window (if any is open) shows the outcome;
@@ -154,6 +176,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     NSArray<FCUResultRow *> *_rows;
     NSString *_emptyMessage;
     BOOL _attached; // waiting for a check that started elsewhere (the automatic one)
+    NSArray<NSURL *> *_migrationLinks; // links of the open switch confirmation, by button tag
 }
 
 - (instancetype)initWithEmptyMessage:(NSString *)message {
@@ -344,7 +367,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     });
 
     NSMutableArray<FCUResultRow *> *rows = [NSMutableArray array];
-    int updates = 0, errors = 0;
+    int updates = 0, replaced = 0, errors = 0;
     NSString *rateLimit = nil;
     for (CheckResult const *r : sorted) {
         FCUResultRow *row = [FCUResultRow new];
@@ -354,6 +377,10 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         // A version like "2.0.0-beta" already says so; only a plain number gets the mark.
         bool marked = r->prerelease && r->latestVersion.find('-') == std::string::npos;
         row.latest = marked ? [NSString stringWithFormat:@"%@ (beta)", ns(r->latestVersion)] : ns(r->latestVersion);
+        if (r->status == UpdateStatus::Replaced) {
+            // The release fields describe the successor; the wide Component column names it, Latest keeps its version.
+            row.component = [NSString stringWithFormat:@"%@ → %@%@", row.component, ns(r->replacedBy), r->replacementInstalled ? @" (installed)" : @""];
+        }
         row.prerelease = r->prerelease;
         row.releaseNotes = ns(r->releaseNotes);
         row.released = releasedText(r->releasedAt);
@@ -365,10 +392,19 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.source = r->sourceOrigin.empty() ? @"" : [NSString stringWithFormat:@"%@ (%@)", ns(r->sourceLabel), ns(r->sourceOrigin)];
         row.tooltip = r->status != UpdateStatus::Error ? ns(r->note)
             : r->note.empty() ? ns(r->errorMessage) : [NSString stringWithFormat:@"%@\n%@", ns(r->errorMessage), ns(r->note)];
+        row.overlap = ns(r->overlap);
+        if (row.overlap.length) row.tooltip = row.tooltip.length ? [NSString stringWithFormat:@"%@\n%@", row.overlap, row.tooltip] : row.overlap;
         row.releaseUrl = [ns(r->releaseUrl) hasPrefix:@"https://"] ? ns(r->releaseUrl) : @"";
         row.name = ns(r->dllName);
-        row.staged = fcu::isStaged(r->dllName);
-        row.blockReason = ns(fcu::installBlockReason(r->status == UpdateStatus::UpdateAvailable, r->dllName, r->downloadUrl, r->assetName, row.staged));
+        row.replacedBy = ns(r->replacedBy);
+        row.replacementInstalled = successorPresent(*r);
+        row.kept = r->kept;
+        row.staged = fcu::isStaged(r->dllName) || fcu::isRemovalStaged(r->dllName);
+        bool const switching = r->status == UpdateStatus::Replaced;
+        // With the successor installed or staged, switching only removes this component: nothing to download.
+        row.blockReason = switching && fcu::isRemovalStaged(r->replacedBy) ? [NSString stringWithFormat:@"%@ is being removed; restart foobar2000 first", ns(r->replacedBy)]
+            : switching && row.replacementInstalled ? (row.staged ? @"Restart foobar2000 to finish" : @"")
+            : ns(fcu::installBlockReason(r->status == UpdateStatus::UpdateAvailable || switching, r->dllName, r->downloadUrl, r->assetName, row.staged));
         std::string backup;
         row.backupVersion = r->dllName != "Core" && fcu::backupVersion(r->dllName, backup) ? ns(backup) : @"";
         if (row.staged) {
@@ -378,7 +414,9 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
             row.tooltip = why;
             row.failed = YES;
         }
+        if (row.overlap.length) row.status = [@"⚠ " stringByAppendingString:row.status];
         if (r->status == UpdateStatus::UpdateAvailable) ++updates;
+        if (r->status == UpdateStatus::Replaced) ++replaced;
         if (r->status == UpdateStatus::Error) {
             ++errors;
             if (!rateLimit && r->errorMessage.rfind("GitHub rate limit reached", 0) == 0) rateLimit = ns(r->errorMessage);
@@ -397,7 +435,9 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     } else if (rateLimit) {
         [self setStatus:rateLimit];
     } else {
-        [self setStatus:[NSString stringWithFormat:@"%d update%s available, %d error%s", updates, updates == 1 ? "" : "s", errors, errors == 1 ? "" : "s"]];
+        NSString *text = [NSString stringWithFormat:@"%d update%s available, %d error%s", updates, updates == 1 ? "" : "s", errors, errors == 1 ? "" : "s"];
+        if (replaced) text = [text stringByAppendingFormat:@", %d replaced", replaced];
+        [self setStatus:text];
     }
 }
 
@@ -422,14 +462,96 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
 - (void)installChecked:(id)sender {
     std::vector<Operation> jobs;
     for (CheckResult const &r : _results) {
-        if ([_checked containsObject:ns(r.dllName)]) jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl});
+        if (![_checked containsObject:ns(r.dllName)]) continue;
+        if (r.status != UpdateStatus::Replaced) {
+            jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl, "", "", ""});
+        } else {
+            jobs.push_back({r.dllName, r.installedVersion, successorPresent(r) ? "" : r.downloadUrl, r.replacedBy, r.replacementTeam, r.migration});
+        }
+    }
+    // A switch removes a component, so it is confirmed; plain updates are not.
+    NSAlert *alert = [self switchConfirmation];
+    if (alert && keepsWindowState()) {
+        NSModalResponse answer = [alert runModal];
+        _migrationLinks = nil;
+        if (answer != NSAlertFirstButtonReturn) return;
     }
     [self runOperations:jobs];
 }
 
+// The confirmation for the ticked Replaced rows, nil when there are none. Its migration links stay valid until
+// _migrationLinks is cleared.
+- (NSAlert *)switchConfirmation {
+    NSMutableArray<NSString *> *switches = [NSMutableArray array];
+    NSMutableArray<NSURL *> *notes = [NSMutableArray array];
+    NSMutableArray<NSString *> *noteTitles = [NSMutableArray array];
+    CheckResult const *only = nullptr;
+    for (CheckResult const &r : _results) {
+        if (![_checked containsObject:ns(r.dllName)] || r.status != UpdateStatus::Replaced) continue;
+        only = &r;
+        // One fact per line, the source on its own: a remote version string cannot run into it.
+        NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObject:
+            [NSString stringWithFormat:@"%@ %@ will be removed.", ns(r.dllName), plain(r.installedVersion)]];
+        if (successorPresent(r)) {
+            [lines addObject:[NSString stringWithFormat:@"%@ is already installed.", ns(r.replacedBy)]];
+        } else {
+            [lines addObject:[NSString stringWithFormat:@"%@ %@ will be installed.", ns(r.replacedBy), plain(r.latestVersion)]];
+            [lines addObject:[NSString stringWithFormat:@"From: %@", plain(r.sourceLabel, 80)]];
+        }
+        [lines addObject:r.replacementOrigin == "Info.plist" ? [NSString stringWithFormat:@"Declared by %@ itself.", ns(r.dllName)]
+            : @"Declared by the built in list of this updater."];
+        [switches addObject:[lines componentsJoinedByString:@"\n"]];
+        NSURL *note = r.migration.empty() ? nil : [NSURL URLWithString:ns(r.migration)];
+        if (note.host.length) {
+            [notes addObject:note];
+            [noteTitles addObject:[NSString stringWithFormat:@"Migration notes for %@ (%@)", ns(r.replacedBy), note.host]];
+        }
+    }
+    if (!only) return nil;
+
+    NSAlert *alert = [NSAlert new];
+    alert.messageText = switches.count == 1 ? [NSString stringWithFormat:@"Switch %@ to %@?", ns(only->dllName), ns(only->replacedBy)]
+        : [NSString stringWithFormat:@"Switch %lu components?", (unsigned long)switches.count];
+    alert.informativeText = [[switches componentsJoinedByString:@"\n\n"]
+        stringByAppendingString:@"\n\nSettings are not carried over. The changes apply when foobar2000 restarts."];
+    // Links read before deciding; each opens in the browser only when clicked.
+    _migrationLinks = notes;
+    if (notes.count) {
+        NSStackView *stack = [NSStackView stackViewWithViews:@[]];
+        stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+        stack.alignment = NSLayoutAttributeLeading;
+        for (NSUInteger i = 0; i < notes.count; ++i) {
+            NSButton *link = [NSButton buttonWithTitle:noteTitles[i] target:self action:@selector(openMigrationLink:)];
+            link.bordered = NO;
+            link.tag = (NSInteger)i;
+            link.toolTip = notes[i].absoluteString;
+            link.attributedTitle = [[NSAttributedString alloc] initWithString:noteTitles[i] attributes:@{
+                NSForegroundColorAttributeName: NSColor.linkColor, NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)}];
+            [stack addArrangedSubview:link];
+        }
+        [stack layoutSubtreeIfNeeded];
+        stack.frame = NSMakeRect(0, 0, 300, stack.fittingSize.height);
+        alert.accessoryView = stack;
+    }
+    [alert addButtonWithTitle:@"Switch"];
+    [alert addButtonWithTitle:@"Cancel"];
+    return alert;
+}
+
+- (void)openMigrationLink:(NSButton *)sender {
+    if (sender.tag >= 0 && sender.tag < (NSInteger)_migrationLinks.count) [[NSWorkspace sharedWorkspace] openURL:_migrationLinks[sender.tag]];
+}
+
 - (void)restorePrevious:(NSMenuItem *)item {
     FCUResultRow *row = item.representedObject;
-    [self runOperations:{{row.name.UTF8String, row.installed.UTF8String, ""}}];
+    [self runOperations:{{row.name.UTF8String, row.installed.UTF8String, "", "", "", ""}}];
+}
+
+// Keeping a replaced component (or no longer keeping it) changes what its row checks, so the check runs again.
+- (void)toggleKeep:(NSMenuItem *)item {
+    FCUResultRow *row = item.representedObject;
+    SetReplacementKept(row.name.UTF8String, row.replacedBy.UTF8String, !row.kept);
+    [self runCheck];
 }
 
 // Takes the update check slot, so a check and an install never run together.
@@ -442,12 +564,17 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         std::vector<fcu::InstallOutcome> outcomes;
         for (size_t i = 0; i < jobs.size() && !abort.is_aborting(); ++i) {
             Operation const &op = jobs[i];
-            fb2k::inMainThread([name = op.name, i, count = jobs.size(), restoring = op.url.empty()] {
+            fb2k::inMainThread([op, i, count = jobs.size()] {
                 if (!g_controller || fb2k::mainAborter().is_aborting()) return;
-                [g_controller setStatus:[NSString stringWithFormat:@"%@ %@ (%zu of %zu)...", restoring ? @"Restoring" : @"Installing", ns(name), i + 1, count]];
+                NSString *what = !op.replacement.empty() ? [NSString stringWithFormat:@"Switching %@ to %@", ns(op.name), ns(op.replacement)]
+                    : [NSString stringWithFormat:@"%@ %@", op.url.empty() ? @"Restoring" : @"Installing", ns(op.name)];
+                [g_controller setStatus:[NSString stringWithFormat:@"%@ (%zu of %zu)...", what, i + 1, count]];
             });
-            outcomes.push_back(op.url.empty() ? fcu::restorePrevious(op.name, op.installedVersion, abort)
-                                              : fcu::installUpdate(op.name, op.installedVersion, op.url, abort));
+            outcomes.push_back(!op.replacement.empty() ? fcu::switchComponent(op.name, op.replacement, op.url, op.team, abort)
+                               : op.url.empty() ? fcu::restorePrevious(op.name, op.installedVersion, abort)
+                                                : fcu::installUpdate(op.name, op.installedVersion, op.url, abort));
+            // Right away, not in finishOperation: quitting during a later download must not lose the note of a staged switch.
+            if (outcomes.back().ok && !op.replacement.empty() && !op.migration.empty()) RememberMigrationNote({op.name, op.replacement, op.migration});
         }
         outcomes.resize(jobs.size());
         fb2k::inMainThread([jobs, outcomes] { finishOperation(jobs, outcomes); });
@@ -471,10 +598,22 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     return item;
 }
 
+- (NSMenuItem *)keepItemForRow:(FCUResultRow *)row {
+    NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Keep %@ (do not switch to %@)", row.name, row.replacedBy]
+                                                  action:@selector(toggleKeep:) keyEquivalent:@""];
+    item.target = self;
+    item.representedObject = row;
+    item.state = row.kept ? NSControlStateValueOn : NSControlStateValueOff;
+    item.enabled = !row.staged && !self.checking && !g_installing;
+    return item;
+}
+
 - (void)menuNeedsUpdate:(NSMenu *)menu {
     [menu removeAllItems];
     NSInteger index = _table.clickedRow;
-    [menu addItem:[self restoreItemForRow:index >= 0 && index < (NSInteger)_rows.count ? _rows[index] : nil]];
+    FCUResultRow *row = index >= 0 && index < (NSInteger)_rows.count ? _rows[index] : nil;
+    [menu addItem:[self restoreItemForRow:row]];
+    if (row.replacedBy.length) [menu addItem:[self keepItemForRow:row]];
 }
 
 - (void)openReleasePage:(id)sender {
@@ -566,7 +705,10 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         BOOL installable = row.blockReason.length == 0;
         box.enabled = installable;
         box.state = installable && [_checked containsObject:row.name] ? NSControlStateValueOn : NSControlStateValueOff;
-        box.toolTip = row.blockReason.length ? row.blockReason : @"Install this update";
+        NSString *action = row.statusCode != UpdateStatus::Replaced ? @"Install this update"
+            : row.replacementInstalled ? [NSString stringWithFormat:@"Remove this component (%@ is installed)", row.replacedBy]
+            : [NSString stringWithFormat:@"Switch to %@", row.replacedBy];
+        box.toolTip = row.blockReason.length ? row.blockReason : action;
         return box;
     }
 
@@ -577,8 +719,11 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         field.lineBreakMode = NSLineBreakByTruncatingTail;
     }
     NSString *cellTip = nil; // what this cell adds; the row's note or error follows it
-    field.textColor = (row.statusCode == UpdateStatus::Error || row.failed) && [ident isEqualToString:@"status"] ? NSColor.systemRedColor : NSColor.labelColor;
-    field.font = [ident isEqualToString:@"status"] && row.statusCode == UpdateStatus::UpdateAvailable
+    bool const status = [ident isEqualToString:@"status"];
+    field.textColor = !status ? NSColor.labelColor
+        : row.statusCode == UpdateStatus::Error || row.failed ? NSColor.systemRedColor
+        : row.overlap.length ? NSColor.systemOrangeColor : NSColor.labelColor;
+    field.font = status && (row.statusCode == UpdateStatus::UpdateAvailable || row.statusCode == UpdateStatus::Replaced)
         ? [NSFont boldSystemFontOfSize:NSFont.systemFontSize] : [NSFont systemFontOfSize:NSFont.systemFontSize];
 
     if ([ident isEqualToString:@"component"]) {
@@ -687,6 +832,21 @@ long DebugSnapshotResultsWindow(std::vector<CheckResult> const& results, bool sh
     SetShowBuiltInComponents(saved);
     g_lastLayout = [controller debugLayout].UTF8String;
     return ok ? (long)[controller visibleRowCount] : -1;
+}
+
+std::string DebugSnapshotSwitchConfirmation(std::vector<CheckResult> const& results, const char* pngPath) {
+    FCUResultsWindowController *controller = [[FCUResultsWindowController alloc] initWithEmptyMessage:@""];
+    [controller showResults:results];
+    [controller debugCheckFirstInstallable];
+    NSAlert *alert = [controller switchConfirmation];
+    if (!alert) return "";
+    [alert layout];
+    DebugWriteSnapshot(alert.window.contentView, NSAppearanceNameAqua, [NSString stringWithUTF8String:pngPath]);
+    NSMutableString *text = [NSMutableString stringWithFormat:@"%@\n%@", alert.messageText, alert.informativeText];
+    for (NSView *v in alert.accessoryView.subviews) {
+        if ([v isKindOfClass:NSButton.class]) [text appendFormat:@"\n[link] %@ -> %@", ((NSButton *)v).title, v.toolTip];
+    }
+    return text.UTF8String;
 }
 #endif
 

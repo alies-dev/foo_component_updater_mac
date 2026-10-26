@@ -19,6 +19,8 @@ struct InstalledComponentInfo {
     std::string about;              // the component's about text (author, description)
     bool hasBundleSource = false;   // Info.plist has an FB2KUpdateSource key
     std::string bundleSourceJson;   // that dictionary as JSON
+    bool hasReplacedBy = false;     // Info.plist has an FB2KReplacedBy key
+    std::string replacedByJson;     // that dictionary as JSON
 };
 
 struct CheckResult {
@@ -38,6 +40,15 @@ struct CheckResult {
     std::string sourceOrigin;  // user, Info.plist, registry, built in list, catalog
     std::string sourceLabel;   // owner/repo or URL
     std::string note;          // row tooltip
+    // Set when the component has a declared replacement. Unless the user keeps this component, the row
+    // is UpdateStatus::Replaced and the release fields above describe the replacement.
+    std::string replacedBy;          // replacement file name
+    std::string replacementOrigin;   // who declared it: "Info.plist" (the component) or "built in list"
+    std::string migration;           // https page with migration notes, "" when none
+    std::string replacementTeam;     // declared Team ID of the successor, "" when not declared
+    bool replacementInstalled = false; // the replacement is installed too: switching only removes this one
+    bool kept = false;               // the user keeps this component; the row is checked as usual
+    std::string overlap;             // other installed components that do the same job, empty when none
 };
 
 // 導入済みコンポーネント一覧を取得する。
@@ -67,7 +78,7 @@ int64_t CurrentUpdateCheckId();
 int DebugChecksBegun();
 #endif
 
-// resultsの中に「更新あり」が1件でもあるかを返す。
+// Whether any row offers something to install: an update or a replacement.
 bool HasUpdateAvailable(std::vector<CheckResult> const& results);
 
 // resultsの中にエラー(通信失敗・解析失敗・Remote Registry取得失敗等)が

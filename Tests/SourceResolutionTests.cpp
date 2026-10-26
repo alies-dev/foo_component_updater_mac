@@ -108,6 +108,16 @@ int main() {
     CHECK(!parseRegistryJson("[]", reg) && reg.empty(), "array is not a registry");
     CHECK(!parseRegistryJson("{\"components\":5}", reg), "components must be an array");
     CHECK(parseRegistryJson("{\"components\":[{\"dll\":\"a\"},{\"dll\":\"b\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\"}]}", reg) && reg.size() == 1, "entries without source dropped");
+    CHECK(parseRegistryJson(R"({"components":[
+        {"component":"foo_a","source":"github","owner":"o","repo":"a"},
+        {"dll":"foo_b","source":"github","owner":"o","repo":"b"},
+        {"component":"foo_c","dll":"foo_c","source":"github","owner":"o","repo":"c"},
+        {"component":"foo_d","dll":"foo_x","source":"github","owner":"o","repo":"d"}]})", reg), "component and dll entries");
+    CHECK(reg.size() == 3 && reg[0].dllName == "foo_a" && reg[1].dllName == "foo_b" && reg[2].dllName == "foo_c",
+          "\"component\" names an entry, the older \"dll\" still does, two different names drop it");
+    CHECK(!parseRegistryJson(R"({"components":[{"dll":42,"source":"github","owner":"o","repo":"r"}]})", reg)
+          && !parseRegistryJson(R"({"components":[{"component":["x"],"source":"github","owner":"o","repo":"r"}]})", reg),
+          "a name that is not a string rejects the whole list, as before");
 
     g_context = "built in list file";
     std::string extra;
