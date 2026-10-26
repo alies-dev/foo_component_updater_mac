@@ -25,7 +25,7 @@ InstallOutcome restorePrevious(std::string const& name, std::string const& insta
 
 // Replaces component `name` with the different component `replacement` at the next start: the package at `url`
 // goes to pending/<replacement> (signature checked, no identity to compare with) and pending/<name> becomes an
-// uninstall marker. When the replacement is installed or staged already, only the marker is written.
+// uninstall marker. With an empty `url` (the replacement is installed or staged already) only the marker is written.
 // No backup is kept: once removed, `name` is no longer listed. Same rules as installUpdate otherwise.
 InstallOutcome switchComponent(std::string const& name, std::string const& replacement, std::string const& url,
                                abort_callback& abort);

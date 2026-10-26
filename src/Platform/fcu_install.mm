@@ -394,11 +394,15 @@ InstallOutcome switchComponent(std::string const& name, std::string const& repla
         struct stat st;
         // Switching to a component that goes at the next start would remove both.
         require(!isRemovalStaged(replacement), "The replacement is waiting to be removed; restart foobar2000 first.");
-        // Installed or already waiting in pending/: only the removal is left to stage.
-        bool const stageNew = !isDirectory(bundleIn(userComponentsDir(), replacement)) && !isStaged(replacement);
+        // The caller decides (the check knows what foobar2000 loaded): no url means the successor is installed or
+        // staged already and only the removal is left; otherwise the package is staged over whatever is on disk.
+        bool const stageNew = !url.empty();
         if (stageNew) {
             require(lstat(newTarget.fileSystemRepresentation, &st) != 0, "foobar2000 has a pending change for the replacement; restart foobar2000 first.");
-            require(!url.empty(), "The replacement offers no package to install.");
+        } else {
+            require(isDirectory(bundleIn(userComponentsDir(), replacement)) || isStaged(replacement), "The replacement offers no package to install.");
+        }
+        if (stageNew) {
             extractPackage(job, replacement, url, abort);
             sanitize(job.stagedAs(replacement));
             // A different product: no identity to compare with, but the signature must hold and the bundle must say what it is.

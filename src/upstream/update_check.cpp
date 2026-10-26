@@ -146,7 +146,8 @@ void AddNote(CheckResult& r, std::string const& text) {
 // A replacement row shows the release of the replacement; only a failed lookup stays an error.
 void FinishReplacement(CheckResult& r) {
     if (r.status == UpdateStatus::Error) {
-        r.errorMessage = "Could not check " + r.replacedBy + ", which replaces this component: " + r.errorMessage;
+        // The error stays first: the window recognizes a rate limit by how the message starts.
+        r.errorMessage += " (while checking " + r.replacedBy + ", which replaces this component)";
         return;
     }
     if (r.status == UpdateStatus::NoSource) AddNote(r, "No source of " + r.replacedBy + " was found.");

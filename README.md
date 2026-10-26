@@ -37,7 +37,7 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 * Nothing is downloaded or installed until you tick an update and click Install. Only `.fb2k-component` packages are installed (GitHub `.zip` files are only reported), and only from the source the update was found at.
 * Before anything is replaced the package must have a valid code signature, the same bundle identifier as the installed component and, when the installed one has a Team ID, the same Team ID. The new version waits in foobar2000's `pending` folder and is applied at the next start.
 * A switch to a successor installs a different component, so there is no identity to compare: its package must have a valid signature and a bundle identifier, and the switch is confirmed first. The successor is named only by the old component's own `Info.plist` or by this updater's built in list.
-* HTTPS only. It contacts GitHub (releases and the shared registry), foobar2000.org and the release hosts named by the shared registry or a component's `FB2KUpdateSource`, and nothing else.
+* HTTPS only. It contacts GitHub (releases and the shared registry), foobar2000.org and the release hosts named by the shared registry, a component's `FB2KUpdateSource` or the source of its declared successor (`FB2KReplacedBy`), and nothing else.
 * No personal data, no telemetry.
 
 ## If an update breaks the updater itself
