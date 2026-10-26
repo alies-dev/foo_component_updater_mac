@@ -11,7 +11,7 @@ foobar2000 for Mac checks only itself for updates; this component checks the com
 <p align="center">
   <img src="docs/images/preferences.png" alt="The Component Updates preferences page under Tools" width="480">
   <br>
-  <em>Preferences > Tools > Component Updates: schedule, prereleases and custom sources.</em>
+  <em>Preferences > Tools > Component Updates: schedule and prereleases.</em>
 </p>
 
 ## Install
@@ -28,14 +28,13 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 * Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back. The updater's own row works the same way.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
 * Checks automatically every few days.
-* Custom sources for components it does not know, see [docs/custom-sources.md](docs/custom-sources.md).
 * foobar2000's built in components are hidden unless you ask for them.
 
 ## Privacy and safety
 
 * Nothing is downloaded or installed until you tick an update and click Install. Only `.fb2k-component` packages are installed (GitHub `.zip` files are only reported), and only from the source the update was found at.
 * Before anything is replaced the package must have a valid code signature, the same bundle identifier as the installed component and, when the installed one has a Team ID, the same Team ID. The new version waits in foobar2000's `pending` folder and is applied at the next start.
-* HTTPS only. It contacts GitHub (releases and the shared registry), foobar2000.org and the hosts of custom sources you add, and nothing else.
+* HTTPS only. It contacts GitHub (releases and the shared registry), foobar2000.org and the release hosts named by the shared registry or a component's `FB2KUpdateSource`, and nothing else.
 * No personal data, no telemetry.
 
 ## If an update breaks the updater itself
@@ -91,7 +90,7 @@ The updater knows the GitHub repository of these components, so it finds their u
 
 *Declared by the component*: the component's `Info.plist` names its source (`FB2KUpdateSource`, see [docs/component-authors.md](docs/component-authors.md)). *Built into the updater*: the source is listed in [Resources/extra_components.json](Resources/extra_components.json), which ships with the updater.
 
-Other components are found through the foobar2000.org catalog, the shared registry or your custom sources when they are listed there.
+Other components are found through the foobar2000.org catalog or the shared registry when they are listed there.
 
 ## Credits
 

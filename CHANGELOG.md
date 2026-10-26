@@ -8,6 +8,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 * Preferences explain "Include prereleases" under the checkbox.
 
+### Removed
+
+* Custom sources in Preferences. Sources saved there are no longer used; components are found through their `FB2KUpdateSource` key, the shared registry, the built in list or the foobar2000.org catalog.
+
 ## [0.3.1] - 2026-10-26
 
 ### Added

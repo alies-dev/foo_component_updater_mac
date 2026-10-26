@@ -44,7 +44,7 @@ struct CheckResult {
 // componentversion::enumerate() を呼ぶため、メインスレッドで実行すること。
 std::vector<InstalledComponentInfo> GetInstalledComponents();
 
-// ソース解決(user mapping, Info.plist, registry, built in list, catalog の順)とバージョン比較を行う。
+// ソース解決(Info.plist, registry, built in list, catalog の順)とバージョン比較を行う。
 // ネットワークI/Oを含むため、ワーカースレッドで実行すること。
 // progress: 状況表示用(ワーカースレッドから呼ばれる)。
 std::vector<CheckResult> RunUpdateCheck(

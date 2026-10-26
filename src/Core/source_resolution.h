@@ -8,7 +8,7 @@
 
 namespace fcu {
 
-enum class SourceOrigin { None, User, InfoPlist, Registry, BuiltIn, Catalog };
+enum class SourceOrigin { None, InfoPlist, Registry, BuiltIn, Catalog };
 
 // Label shown in the Source column.
 char const* originLabel(SourceOrigin origin);
@@ -26,7 +26,6 @@ struct BundleSource {
 };
 
 struct SourceLists {
-    std::vector<RepositoryMappingEntry> user;
     std::vector<RepositoryMappingEntry> registry;
     std::vector<RepositoryMappingEntry> builtIn;
 };
@@ -35,13 +34,13 @@ struct SourceLists {
 // Entries without dll or source are dropped, as upstream does.
 bool parseRegistryJson(std::string const& text, std::vector<RepositoryMappingEntry>& out);
 
-// Plan section 4 order, first match wins: user mappings, Info.plist key,
-// remote registry, built in list, official catalog. "Core" components get none.
+// First match wins: Info.plist key, remote registry, built in list, official
+// catalog. "Core" components get none.
 ResolvedSource resolveSource(std::string const& fileName, BundleSource const& bundle, SourceLists const& lists);
 
 // Whether a GitHub check that ended with this outcome continues with the catalog:
-// only when no release has a matching package, and never for the user's own mapping.
-// Incomplete and failed checks keep their result.
+// only when no release has a matching package. Incomplete and failed checks keep
+// their result.
 bool fallsThroughToCatalog(SourceOrigin origin, AssetOutcome::Kind outcome);
 
 } // namespace fcu

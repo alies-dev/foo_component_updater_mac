@@ -74,7 +74,9 @@ All files:
 * The `http_client` request is replaced by `fcu::httpGet(fcu::endpoint(k_remoteRegistryUrl, "/registry/known_components.json"), {}, abort)`. `fcu::endpoint` returns the URL unchanged in Release builds.
 * The entries are deserialized by a new `parseEntries` before the cache is replaced, so a download with a wrong typed field keeps the previous cache. The same function reads the cache.
 
-`repository_mapping.cpp`, `repository_mapping.h`, `remote_registry.h`, `automatic_check.h`: include path only (or nothing).
+`remote_registry.h`, `automatic_check.h`: include path only (or nothing).
+
+`repository_mapping.h` keeps only `RepositoryMappingEntry`, with English comments; the user mapping storage (`repository_mapping.cpp`) is not ported.
 
 `automatic_check.cpp`:
 
@@ -104,7 +106,7 @@ All files:
 * `compareVersions` and its helpers move verbatim to `update_parse.cpp`.
 * The GitLab, Codeberg, marc2k3, SourceForge and hyv fetchers keep their request URLs; the HTTP call becomes `fcu::httpGet` and the parsing after it moves verbatim to `ParseGitLabRelease`, `ParseCodebergRelease`, `ParseMarc2k3Page`, `BuildSourceForgeRssUrl`, `ParseSourceForgeFeed` and `ParseHyvPage` in `update_parse.cpp`. The GitLab release URL is built with `std::string` instead of `pfc::string8`.
 * `FetchGitHubLatestRelease` (`/releases/latest`) is replaced by `Core/github_releases` (one `/releases` request per repository, selection by package file name).
-* Source resolution is `Core/source_resolution` (user mappings, `Info.plist` key, registry, built in list, catalog) instead of the two lookups.
+* Source resolution is `Core/source_resolution` (`Info.plist` key, registry, built in list, catalog) instead of the two lookups.
 * Components without a source are listed as `NoSource` instead of skipped.
 * The `mainmenu_commands` class moves to `Integration/Main.mm`.
 
