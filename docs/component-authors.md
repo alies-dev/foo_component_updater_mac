@@ -2,7 +2,15 @@
 
 This updater finds new versions of third party foobar2000 components. These guidelines make yours easy to find and compare.
 
-## Publish on GitHub
+## Recommended: get listed in the official repository
+
+foobar2000 has an official component repository, [foobar2000.org/components](https://www.foobar2000.org/components/system/mac), with a macOS section. To get a component listed there, register on the Hydrogenaudio forum and contact [Peter](https://hydrogenaud.io/index.php?action=profile;u=84), the foobar2000 developer, with information about your component ([foobar2000 developer documentation](https://www.foobar2000.org/RTFM), "Getting a component listed on foobar2000.org/components").
+
+A listing reaches everyone who browses the repository, and this updater needs nothing else: it finds a listed component by its file name at `https://www.foobar2000.org/components/view/<file name>` when the listing names macOS under "Supported system" or "Supported systems", compares the version shown there with the installed one and installs the package from it. Keep the version on the listing equal to `DECLARE_COMPONENT_VERSION`, and the package in the layout described below (`mac/<file name>.component`, signed, same `CFBundleIdentifier` as before).
+
+## Fallback: publish on GitHub
+
+For components that are not in the official repository (yet), or whose updates appear on GitHub first, the updater reads GitHub releases. Together with the `FB2KUpdateSource` key below this needs nobody's list:
 
 1. Publish a GitHub Release and attach the package, a `.fb2k-component` file.
 2. Name the package `<file name>.fb2k-component`, where `<file name>` is what the Components page shows in the Module column (`foo_example` for `foo_example.component`). That exact name is always preferred. The updater also accepts `<file name>` followed by an optional version and any of `macos`, `mac`, `arm64`, `universal`, separated by `-` or `_` and in any letter case (`foo_example-macos.fb2k-component`, `foo_example-1.2.0-macos-arm64.fb2k-component`), and a `.zip` of that form (`foo_example-v1.2.0.zip`), although a zip is only reported and never installed. Anything else after the name, such as `-bin`, `-win32` or `_extra`, is not a match, so `foo_example` never picks up `foo_example_extra`.
@@ -34,11 +42,9 @@ Rules:
 * An invalid value is ignored, the next source is tried, and the results window says "Invalid FB2KUpdateSource" in the row tooltip.
 * The key only affects the bundle that contains it. It takes effect from the first release that includes it, so older installed versions are found through the registry.
 
-## Or publish in the official catalog
+## When the official repository is checked
 
-Components listed on foobar2000.org with macOS under "Supported system" or "Supported systems" are found by file name without any of the above, from `https://www.foobar2000.org/components/view/<file name>`.
-
-The catalog is also the next step when a GitHub source from the registry, the built in list or `FB2KUpdateSource` has no release with a matching package: the updater then checks the catalog page of the same component.
+Without any of the above, a component listed in the official repository is found there by file name. The repository is also the next step when a GitHub source from the registry, the built in list or `FB2KUpdateSource` has no release with a matching package: the updater then checks the listing of the same component.
 
 ## Order of lookup
 
