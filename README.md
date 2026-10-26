@@ -3,9 +3,9 @@
 foobar2000 for Mac checks only itself for updates; this component checks the components you added.
 
 <p align="center">
-  <img src="docs/images/results-window.png" alt="The results window listing installed components with installed version, latest version and status" width="720">
+  <img src="docs/images/results-window.png" alt="The results window listing installed components with installed version, latest version, release date and status" width="720">
   <br>
-  <em>Help > Check for Component Updates...: every installed component with its installed and latest version.</em>
+  <em>Help > Check for Component Updates...: every installed component with its installed and latest version and the release date.</em>
 </p>
 
 <p align="center">
