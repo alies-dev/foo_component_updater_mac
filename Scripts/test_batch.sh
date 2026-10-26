@@ -26,6 +26,8 @@
 #                switch to an ad hoc successor is refused (no declared Team ID: the old one's applies)
 #   m2-switch    foo_abx declares FB2KReplacedBy foo_abx_ng: a kept row is checked as usual, the switch stages foo_abx_ng and
 #                removes foo_abx; after the restart only foo_abx_ng is installed and its migration notes are offered once
+#   m2-core      foo_abx declares FB2KReplacedBy foobar2000 2.0: the row is Replaced (not for a pretend older foobar2000), Install stages only
+#                the removal; after the restart foo_abx is gone and its migration notes are offered once
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
 # (verified with diff -rq); foobar2000 is started only with `open -g -a foobar2000`,
@@ -575,6 +577,30 @@ run_m2() {
             [ ! -e "$PROFILE/user-components/foo_abx" ] && [ -z "$(ls "$PROFILE/user-components/pending" 2>/dev/null)" ] \
                 && say "PASS m2 switch-after: user-components/foo_abx is gone and nothing is pending" \
                 || fail "m2 switch-after: foo_abx or pending entries remain: $(ls "$PROFILE/user-components" "$PROFILE/user-components/pending" 2>&1)"
+        fi
+    fi
+    quit_or_stop m2
+
+    # core: foobar2000 itself replaced foo_abx (FB2KReplacedBy foobar2000 2.0, older than the running version); no successor, only the removal is staged.
+    rm -rf "$PROFILE/user-components/pending/foo_abx" "$PROFILE/user-components/foo_abx" && mkdir "$PROFILE/user-components/foo_abx"
+    cp -R "$WORK/good/mac/foo_abx.component" "$PROFILE/user-components/foo_abx/"
+    /usr/libexec/PlistBuddy -c "Add :FB2KReplacedBy dict" -c "Add :FB2KReplacedBy:foobar2000 string 2.0" \
+        -c "Add :FB2KReplacedBy:migration_url string https://example.org/foo_abx#built-in" "$installed/Contents/Info.plist"
+    codesign --force --sign - "$installed" >/dev/null 2>&1 || { fail "codesign foo_abx with FB2KReplacedBy foobar2000"; exit 1; }
+    BATCH_PID=""
+    if m2_start core; then
+        check_run m2-core
+        [ -f "$PROFILE/user-components/pending/foo_abx" ] && [ ! -s "$PROFILE/user-components/pending/foo_abx" ] \
+            && [ "$(ls "$PROFILE/user-components/pending" | wc -l | tr -d ' ')" = 1 ] \
+            && say "PASS m2 core: pending/foo_abx is an empty removal marker and nothing else is pending" \
+            || fail "m2 core: pending is not as expected: $(ls -la "$PROFILE/user-components/pending" 2>&1)"
+        previous="$BATCH_PID"
+        if m2_wait core-after; then
+            check_run m2-core-after "$previous"
+            m2_disk core-after ""
+            [ ! -e "$PROFILE/user-components/foo_abx" ] && [ -z "$(ls "$PROFILE/user-components/pending" 2>/dev/null)" ] \
+                && say "PASS m2 core-after: user-components/foo_abx is gone and nothing is pending" \
+                || fail "m2 core-after: foo_abx or pending entries remain: $(ls "$PROFILE/user-components" "$PROFILE/user-components/pending" 2>&1)"
         fi
     fi
     quit_or_stop m2

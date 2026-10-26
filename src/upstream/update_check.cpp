@@ -325,6 +325,9 @@ void RunChecks(
     }
     std::map<std::string, std::string> const overlaps = fcu::overlapNotes(names, groups);
 
+    // Read once: what the foobar2000 that is running now already includes.
+    std::string const runningVersion = core_version_info_v2::get()->get_version_as_text();
+
     for (auto const& comp : installed) {
         CheckResult r;
         r.dllName = comp.fileName;
@@ -342,9 +345,22 @@ void RunChecks(
             r.replacementOrigin = rl.origin == fcu::ReplacementOrigin::InfoPlist ? "Info.plist" : "built in list";
             r.kept = IsReplacementKept(comp.fileName, r.replacedBy);
         }
-        if (!r.replacedBy.empty() && !r.kept) {
-            AddNote(r, "Replaced by " + r.replacedBy + (rl.origin == fcu::ReplacementOrigin::InfoPlist
-                ? ", as this component declares." : ", according to the built in list of this updater."));
+        std::string const declaredBy = rl.origin == fcu::ReplacementOrigin::InfoPlist ? ", as this component declares." : ", according to the built in list of this updater.";
+        bool const byFoobar2000 = !rl.replacement.foobar2000.empty();
+        bool const foobar2000Older = byFoobar2000 && !r.kept && !fcu::foobar2000Includes(runningVersion, rl.replacement.foobar2000);
+        if (byFoobar2000 && !r.kept && !foobar2000Older) {
+            // foobar2000 itself took over: only the removal is left, so there is no successor to look up or download.
+            AddNote(r, "Replaced by foobar2000 " + rl.replacement.foobar2000 + ", which includes it" + declaredBy);
+            AddNote(r, rl.note);
+            r.status = UpdateStatus::Replaced;
+            r.replacedByFoobar2000 = true;
+            r.replacementInstalled = true;
+            r.latestVersion = rl.replacement.foobar2000;
+            results.push_back(std::move(r));
+            continue;
+        }
+        if (!r.replacedBy.empty() && !r.kept && !byFoobar2000) {
+            AddNote(r, "Replaced by " + r.replacedBy + declaredBy);
             AddNote(r, rl.note);
             r.status = UpdateStatus::Replaced;
             auto present = installedVersions.find(fcu::normalizeComponentName(r.replacedBy));
@@ -387,6 +403,7 @@ void RunChecks(
         fcu::ResolvedSource rs = fcu::resolveSource(comp.fileName, {comp.hasBundleSource, comp.bundleSourceJson}, lists);
         AddNote(r, rs.note);
         AddNote(r, rl.note);
+        if (foobar2000Older) AddNote(r, "foobar2000 " + rl.replacement.foobar2000 + " includes this; after updating foobar2000 it can be removed.");
         if (rs.origin == fcu::SourceOrigin::None) {
             r.status = UpdateStatus::NoSource;
             if (comp.fileName == "Core") r.note = "Built in to foobar2000.";

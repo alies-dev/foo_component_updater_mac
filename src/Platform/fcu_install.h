@@ -32,6 +32,10 @@ InstallOutcome restorePrevious(std::string const& name, std::string const& insta
 InstallOutcome switchComponent(std::string const& name, std::string const& replacement, std::string const& url,
                                std::string const& team, abort_callback& abort);
 
+// Stages the removal of `name` at the next start: pending/<name> becomes an uninstall marker (an empty file).
+// A staged update of `name` is dropped. Nothing is downloaded.
+InstallOutcome stageRemoval(std::string const& name, abort_callback& abort);
+
 // pending/<name>/<name>.component exists: an install that waits for a restart.
 bool isStaged(std::string const& name);
 

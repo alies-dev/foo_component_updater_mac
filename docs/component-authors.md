@@ -66,7 +66,7 @@ When your component is superseded (renamed, merged into another one, taken over 
 
 Rules:
 
-* `component` is required: the successor's file name (letters, digits, `.`, `_`, `-`, `+`), not your own.
+* `component` is required, unless foobar2000 itself replaced your component (see below): the successor's file name (letters, digits, `.`, `_`, `-`, `+`), not your own. `foobar2000` is not a valid component name here.
 * `source`, `owner`, `repo` and `url` say where the successor's releases live and follow the `FB2KUpdateSource` rules above. Declare them: the successor is never looked up in the shared registry or the foobar2000.org catalog, because a list run by someone else must not decide which code your declaration installs. Only a successor that the updater's built in list knows can go without them; when the list knows it, the list's source is used even if you declare another one.
 * `migration_url` is optional: an `https://` page (printable ASCII, no user name before the host) that tells users what to set up again, such as logging in once more. The confirmation shows it as a link, and after the restart that completes the switch foobar2000 offers it once. It opens only when the user clicks it.
 * `team` is optional: the successor's Team ID (10 capital letters or digits). If your component is signed with a Developer ID, the successor must be signed by the same team unless `team` names another one. Ad hoc signed components have nothing to pin.
@@ -76,3 +76,22 @@ Rules:
 * An invalid key is ignored and the row tooltip says "Invalid FB2KReplacedBy".
 
 The updater's built in list can declare the same for components whose author no longer ships releases (`"replaced_by"` with the same fields).
+
+### When foobar2000 itself replaced your component
+
+If a foobar2000 release now includes what your component did, declare the version instead of a successor:
+
+```xml
+<key>FB2KReplacedBy</key>
+<dict>
+    <key>foobar2000</key><string>2.27</string>
+    <key>migration_url</key><string>https://example.org/foo_example#built-in</string>
+</dict>
+```
+
+* Declare exactly one of `component` and `foobar2000`. With `foobar2000`, `source`, `owner`, `repo`, `url` and `team` are not allowed: there is nothing to download.
+* `foobar2000` is the first foobar2000 version that includes the feature, in a form such as `2.27`. Anything else is an invalid key.
+* `migration_url` is optional and works as above.
+* When the running foobar2000 is that version or newer, the results window shows the row as "Replaced by foobar2000 2.27". Ticking it and clicking Install only removes your component at the next start of foobar2000; nothing is downloaded. Users can keep yours instead (right click > Keep).
+* With an older foobar2000 the row is checked as usual and its note says that foobar2000 2.27 includes it and that it can be removed after updating foobar2000. It does not count as "Replaced" then.
+* The updater's built in list accepts the same in `"replaced_by"`: `{"foobar2000": "2.27"}`.

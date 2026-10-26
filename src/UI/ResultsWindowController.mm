@@ -9,6 +9,7 @@
 #include "../upstream/automatic_check.h"
 #include "DebugSnapshot.h"
 #include "../Core/package_layout.h"
+#include "../Core/replacement.h"
 #include "../Platform/fcu_install.h"
 
 NSNotificationName const FCUUpdateCheckCompletedNotification = @"FCUUpdateCheckCompleted";
@@ -69,9 +70,19 @@ NSString *statusText(UpdateStatus s) {
     return @"";
 }
 
+// foobar2000 itself is no component: it is never staged, so it is never looked up as one.
+bool successorIsFoobar2000(CheckResult const& r) {
+    return r.replacedBy == fcu::kFoobar2000;
+}
+
 // The successor of a Replaced row is installed, or staged by an earlier switch or by foobar2000: switching only removes.
 bool successorPresent(CheckResult const& r) {
+    if (successorIsFoobar2000(r)) return r.replacedByFoobar2000;
     return r.replacementInstalled || fcu::isStaged(r.replacedBy);
+}
+
+bool successorRemovalStaged(CheckResult const& r) {
+    return !successorIsFoobar2000(r) && fcu::isRemovalStaged(r.replacedBy);
 }
 
 }
@@ -84,7 +95,7 @@ bool successorPresent(CheckResult const& r) {
 @property (copy) NSString *name, *blockReason, *backupVersion; // file name, why not installable ("" when it is), backup version ("" when none)
 @property (copy) NSString *replacedBy, *overlap; // see CheckResult; "" when none
 @property UpdateStatus statusCode;
-@property BOOL staged, failed, replacementInstalled, kept;
+@property BOOL staged, failed, replacementInstalled, kept, replacedByFoobar2000;
 @end
 @implementation FCUResultRow
 @end
@@ -134,6 +145,7 @@ struct Operation {
     std::string name, installedVersion, url; // url empty: restore the backup (unless replacement is set)
     std::string replacement;                 // set: switch to that component (url may be empty when it is installed)
     std::string team, migration;             // of a switch: declared Team ID and migration notes page, "" when none
+    bool removeOnly = false;                 // foobar2000 replaced the component: stage the removal, replacement is "foobar2000"
 };
 
 // Main thread, once the worker is done. The window (if any is open) shows the outcome;
@@ -379,7 +391,8 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.latest = marked ? [NSString stringWithFormat:@"%@ (beta)", ns(r->latestVersion)] : ns(r->latestVersion);
         if (r->status == UpdateStatus::Replaced) {
             // The release fields describe the successor; the wide Component column names it, Latest keeps its version.
-            row.component = [NSString stringWithFormat:@"%@ → %@%@", row.component, ns(r->replacedBy), r->replacementInstalled ? @" (installed)" : @""];
+            row.component = [NSString stringWithFormat:@"%@ → %@%@", row.component, ns(r->replacedBy),
+                r->replacementInstalled && !r->replacedByFoobar2000 ? @" (installed)" : @""];
         }
         row.prerelease = r->prerelease;
         row.releaseNotes = ns(r->releaseNotes);
@@ -398,11 +411,12 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.name = ns(r->dllName);
         row.replacedBy = ns(r->replacedBy);
         row.replacementInstalled = successorPresent(*r);
+        row.replacedByFoobar2000 = r->replacedByFoobar2000;
         row.kept = r->kept;
         row.staged = fcu::isStaged(r->dllName) || fcu::isRemovalStaged(r->dllName);
         bool const switching = r->status == UpdateStatus::Replaced;
         // With the successor installed or staged, switching only removes this component: nothing to download.
-        row.blockReason = switching && fcu::isRemovalStaged(r->replacedBy) ? [NSString stringWithFormat:@"%@ is being removed; restart foobar2000 first", ns(r->replacedBy)]
+        row.blockReason = switching && successorRemovalStaged(*r) ? [NSString stringWithFormat:@"%@ is being removed; restart foobar2000 first", ns(r->replacedBy)]
             : switching && row.replacementInstalled ? (row.staged ? @"Restart foobar2000 to finish" : @"")
             : ns(fcu::installBlockReason(r->status == UpdateStatus::UpdateAvailable || switching, r->dllName, r->downloadUrl, r->assetName, row.staged));
         std::string backup;
@@ -466,7 +480,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         if (r.status != UpdateStatus::Replaced) {
             jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl, "", "", ""});
         } else {
-            jobs.push_back({r.dllName, r.installedVersion, successorPresent(r) ? "" : r.downloadUrl, r.replacedBy, r.replacementTeam, r.migration});
+            jobs.push_back({r.dllName, r.installedVersion, successorPresent(r) ? "" : r.downloadUrl, r.replacedBy, r.replacementTeam, r.migration, r.replacedByFoobar2000});
         }
     }
     // A switch removes a component, so it is confirmed; plain updates are not.
@@ -492,7 +506,9 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         // One fact per line, the source on its own: a remote version string cannot run into it.
         NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObject:
             [NSString stringWithFormat:@"%@ %@ will be removed.", ns(r.dllName), plain(r.installedVersion)]];
-        if (successorPresent(r)) {
+        if (r.replacedByFoobar2000) {
+            [lines addObject:[NSString stringWithFormat:@"foobar2000 %@ already includes it.", plain(r.latestVersion)]];
+        } else if (successorPresent(r)) {
             [lines addObject:[NSString stringWithFormat:@"%@ is already installed.", ns(r.replacedBy)]];
         } else {
             [lines addObject:[NSString stringWithFormat:@"%@ %@ will be installed.", ns(r.replacedBy), plain(r.latestVersion)]];
@@ -510,8 +526,9 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     if (!only) return nil;
 
     NSAlert *alert = [NSAlert new];
-    alert.messageText = switches.count == 1 ? [NSString stringWithFormat:@"Switch %@ to %@?", ns(only->dllName), ns(only->replacedBy)]
-        : [NSString stringWithFormat:@"Switch %lu components?", (unsigned long)switches.count];
+    alert.messageText = switches.count > 1 ? [NSString stringWithFormat:@"Switch %lu components?", (unsigned long)switches.count]
+        : only->replacedByFoobar2000 ? [NSString stringWithFormat:@"Remove %@?", ns(only->dllName)]
+        : [NSString stringWithFormat:@"Switch %@ to %@?", ns(only->dllName), ns(only->replacedBy)];
     alert.informativeText = [[switches componentsJoinedByString:@"\n\n"]
         stringByAppendingString:@"\n\nSettings are not carried over. The changes apply when foobar2000 restarts."];
     // Links read before deciding; each opens in the browser only when clicked.
@@ -566,11 +583,13 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
             Operation const &op = jobs[i];
             fb2k::inMainThread([op, i, count = jobs.size()] {
                 if (!g_controller || fb2k::mainAborter().is_aborting()) return;
-                NSString *what = !op.replacement.empty() ? [NSString stringWithFormat:@"Switching %@ to %@", ns(op.name), ns(op.replacement)]
+                NSString *what = op.removeOnly ? [NSString stringWithFormat:@"Removing %@", ns(op.name)]
+                    : !op.replacement.empty() ? [NSString stringWithFormat:@"Switching %@ to %@", ns(op.name), ns(op.replacement)]
                     : [NSString stringWithFormat:@"%@ %@", op.url.empty() ? @"Restoring" : @"Installing", ns(op.name)];
                 [g_controller setStatus:[NSString stringWithFormat:@"%@ (%zu of %zu)...", what, i + 1, count]];
             });
-            outcomes.push_back(!op.replacement.empty() ? fcu::switchComponent(op.name, op.replacement, op.url, op.team, abort)
+            outcomes.push_back(op.removeOnly ? fcu::stageRemoval(op.name, abort)
+                               : !op.replacement.empty() ? fcu::switchComponent(op.name, op.replacement, op.url, op.team, abort)
                                : op.url.empty() ? fcu::restorePrevious(op.name, op.installedVersion, abort)
                                                 : fcu::installUpdate(op.name, op.installedVersion, op.url, abort));
             // Right away, not in finishOperation: quitting during a later download must not lose the note of a staged switch.
@@ -706,6 +725,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         box.enabled = installable;
         box.state = installable && [_checked containsObject:row.name] ? NSControlStateValueOn : NSControlStateValueOff;
         NSString *action = row.statusCode != UpdateStatus::Replaced ? @"Install this update"
+            : row.replacedByFoobar2000 ? [NSString stringWithFormat:@"Remove this component (foobar2000 %@ includes it)", row.latest]
             : row.replacementInstalled ? [NSString stringWithFormat:@"Remove this component (%@ is installed)", row.replacedBy]
             : [NSString stringWithFormat:@"Switch to %@", row.replacedBy];
         box.toolTip = row.blockReason.length ? row.blockReason : action;

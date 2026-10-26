@@ -188,6 +188,28 @@ def m2(run, log, previous_pid):
         check("the alert after the restart names both components and the notes' host",
               log["migration_alert"] == "foo_abx_ng replaced foo_abx\nIts author wrote migration notes on github.com: what to set up again after the switch.",
               log["migration_alert"])
+    elif run == "m2-core":
+        row, older = log["row"], log["older_row"]
+        check("foo_abx shows Replaced by foobar2000 2.0 from its own Info.plist, with migration notes",
+              (row["status"], row["replaced_by"], row["replaced_by_foobar2000"], row["origin"], row["latest"], row["migration"])
+              == ("replaced", "foobar2000", True, "Info.plist", "2.0", "https://example.org/foo_abx#built-in") and "foobar2000 2.0" in row["note"], row)
+        check("a foobar2000 older than the declared version does not replace it: the row is checked as usual and says when it can go",
+              (older["status"], older["replaced_by_foobar2000"]) == ("up_to_date", False) and "foobar2000 99 includes this" in older["note"], older)
+        check("start state: foo_abx 2.2.3 installed, nothing pending", (before["installed_version"], before["staged"], before["removal_staged"]) == ("2.2.3", False, False), before)
+        check("Install staged the removal of foo_abx", o["stage_removal"]["ok"] is True and after["removal_staged"] is True, log)
+        expected = ("Remove foo_abx?\nfoo_abx 2.2.3 will be removed.\nfoobar2000 2.0 already includes it.\nDeclared by foo_abx itself.\n\n"
+                    "Settings are not carried over. The changes apply when foobar2000 restarts.\n"
+                    "[link] Migration notes for foobar2000 (example.org) -> https://example.org/foo_abx#built-in")
+        check("the confirmation names what goes, that foobar2000 includes it, who declared it, and links the notes",
+              log["core_confirmation"] == expected, log["core_confirmation"])
+    elif run == "m2-core-after":
+        check("after the restart foo_abx is gone and nothing is pending", (before["installed_version"], before["staged"], before["removal_staged"]) == ("", False, False), before)
+        check("the migration notes of the applied removal are kept until offered, then gone",
+              log["migration_notes"] == [{"from": "foo_abx", "to": "foobar2000", "url": "https://example.org/foo_abx#built-in"}]
+              and log["migration_notes_kept_until_offered"] == 1 and log["migration_notes_again"] == 0, log)
+        check("the alert after the restart names foobar2000 and the notes' host",
+              log["migration_alert"] == "foobar2000 replaced foo_abx\nIts author wrote migration notes on example.org: what to set up again after the switch.",
+              log["migration_alert"])
     sys.exit(1 if failures else 0)
 
 

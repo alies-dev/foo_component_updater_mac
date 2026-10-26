@@ -7,6 +7,7 @@
 #include "list_entry.h"
 #include "mapping_validation.h"
 #include "../upstream/third_party/nlohmann/json.hpp"
+#include "../upstream/update_parse.h"
 
 namespace fcu {
 
@@ -17,7 +18,7 @@ namespace {
 bool isComponentName(std::string const& s) {
     if (s.empty() || s.size() > 128 || s[0] == '.') return false;
     std::string const n = normalizeComponentName(s);
-    if (n == "pending" || n == "core") return false;
+    if (n == "pending" || n == "core" || n == "foobar2000") return false;
     return std::all_of(s.begin(), s.end(), [](char c) { return isAsciiAlnum(c) || c == '.' || c == '_' || c == '-' || c == '+'; });
 }
 
@@ -36,22 +37,47 @@ bool parseObject(nlohmann::json const& obj, Replacement& out, std::string& error
     }
     for (auto it = obj.begin(); it != obj.end(); ++it) {
         std::string const& k = it.key();
-        if (k != "component" && k != "migration_url" && k != "team" && k != "source" && k != "owner" && k != "repo" && k != "url") {
+        if (k != "component" && k != "foobar2000" && k != "migration_url" && k != "team" && k != "source" && k != "owner" && k != "repo" && k != "url") {
             error = "unknown field \"" + k + "\"";
             return false;
         }
     }
-    auto component = obj.find("component");
-    if (component == obj.end() || !component->is_string() || !isComponentName(component->get<std::string>())) {
-        error = "\"component\" must name the successor (letters, digits, '.', '_', '-', '+')";
+    bool const hasComponent = obj.contains("component");
+    bool const hasFoobar2000 = obj.contains("foobar2000");
+    if (hasComponent && hasFoobar2000) {
+        error = "use either \"component\" or \"foobar2000\"";
+        return false;
+    }
+    if (!hasComponent && !hasFoobar2000) {
+        error = "\"component\" or \"foobar2000\" is required";
         return false;
     }
     Replacement r;
-    // As declared: it names the package and the folders, which are case sensitive. Only a ".dll" suffix goes.
-    r.name = component->get<std::string>();
-    if (normalizeComponentName(r.name).size() < r.name.size()) r.name.resize(r.name.size() - 4);
     nlohmann::json fields = obj;
-    fields.erase("component");
+    if (hasFoobar2000) {
+        auto version = obj.find("foobar2000");
+        if (!version->is_string() || compareVersions(version->get<std::string>(), version->get<std::string>()) == UpdateStatus::ComparisonUnsupported) {
+            error = "\"foobar2000\" must be a version such as 2.27";
+            return false;
+        }
+        if (obj.contains("source") || obj.contains("owner") || obj.contains("repo") || obj.contains("url") || obj.contains("team")) {
+            error = "\"foobar2000\" takes no source or team";
+            return false;
+        }
+        r.name = kFoobar2000;
+        r.foobar2000 = version->get<std::string>();
+        fields.erase("foobar2000");
+    } else {
+        auto component = obj.find("component");
+        if (!component->is_string() || !isComponentName(component->get<std::string>())) {
+            error = "\"component\" must name the successor (letters, digits, '.', '_', '-', '+')";
+            return false;
+        }
+        // As declared: it names the package and the folders, which are case sensitive. Only a ".dll" suffix goes.
+        r.name = component->get<std::string>();
+        if (normalizeComponentName(r.name).size() < r.name.size()) r.name.resize(r.name.size() - 4);
+        fields.erase("component");
+    }
     if (auto m = fields.find("migration_url"); m != fields.end()) {
         if (!m->is_string() || !isMigrationUrl(m->get<std::string>())) {
             error = "\"migration_url\" must be an https:// URL of printable ASCII without a user name";
@@ -88,6 +114,10 @@ bool parseReplacedBy(std::string const& json, Replacement& out, std::string& err
     }
     error = "Invalid FB2KReplacedBy: " + error;
     return false;
+}
+
+bool foobar2000Includes(std::string const& running, std::string const& declared) {
+    return compareVersions(running, declared) == UpdateStatus::UpToDate;
 }
 
 void parseBuiltInExtras(std::string const& text, std::map<std::string, Replacement>& replacements,

@@ -8,19 +8,27 @@
 
 namespace fcu {
 
-// The component that took over from an installed one.
+// Replacement::name when foobar2000 itself took over from a component; a reserved name, no component has it.
+inline constexpr char const* kFoobar2000 = "foobar2000";
+
+// What took over from an installed component: another component, or foobar2000 itself.
 struct Replacement {
-    std::string name;              // file name of the successor as declared (case kept, no ".dll"); compare normalized
+    std::string name;              // file name of the successor as declared (case kept, no ".dll"; compare normalized), or kFoobar2000
     bool hasSource = false;        // where its updates live was declared with it
     RepositoryMappingEntry source; // when hasSource; source.dllName is the normalized name
     std::string migration;         // https page with migration notes, "" when none
     std::string team;              // Team ID the successor must be signed with, "" when not declared
+    std::string foobar2000;        // version of foobar2000 that includes the component's feature, "" for a component successor
 };
 
-// Strict parse of an FB2KReplacedBy dictionary (given as JSON): "component" required; optional
-// source fields under the FB2KUpdateSource rules (all or nothing), "migration_url" (https URL) and
-// "team" (10 character Team ID). Errors start "Invalid FB2KReplacedBy: ".
+// Strict parse of an FB2KReplacedBy dictionary (given as JSON): exactly one of "component" and
+// "foobar2000" (a version); with "component" optional source fields under the FB2KUpdateSource rules
+// (all or nothing) and "team" (10 character Team ID); both shapes take "migration_url" (https URL).
+// Errors start "Invalid FB2KReplacedBy: ".
 bool parseReplacedBy(std::string const& json, Replacement& out, std::string& error);
+
+// True when the running foobar2000 version is at least `declared`; false when either cannot be compared.
+bool foobar2000Includes(std::string const& running, std::string const& declared);
 
 // Several components that do the same job; running two of them does it twice.
 struct ComponentGroup {

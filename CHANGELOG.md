@@ -7,6 +7,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Added
 
 * "Replaced" status: when a component declares its successor (`FB2KReplacedBy` in its `Info.plist`, or the built in list), tick the row and click Install to switch: the successor is installed and the old component removed at the next start. A migration notes link the author provides is shown before the switch and offered once after it. Right click > Keep keeps the old one.
+* "Replaced" also covers components that foobar2000 itself now includes: a component can declare the foobar2000 version with `foobar2000` in `FB2KReplacedBy` (or `"replaced_by"` in the built in list). From that version, tick the row and click Install to remove the component at the next start; nothing is downloaded. Older versions show a note instead.
 * A warning when two installed components do the same job, for now the Last.fm scrobblers (foo_jl_scrobble, foo_mac_scrobble, foo_lastfm, foo_scrobbler_mac).
 
 ### Changed

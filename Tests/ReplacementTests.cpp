@@ -1,4 +1,4 @@
-// TEST_DEPS: src/Core/replacement.cpp src/Core/mapping_validation.cpp
+// TEST_DEPS: src/Core/replacement.cpp src/Core/mapping_validation.cpp src/upstream/update_parse.cpp
 #include "TestHarness.h"
 #include "Fixtures.h"
 #include "../src/Core/replacement.h"
@@ -50,6 +50,32 @@ int main() {
     rejects("{\"component\":\"foo_new\",\"team\":\"ABCDE1234\"}", "\"team\"");
     CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"migration_url\":\"https://x.y/a?b=c@d\"}", r, err), "an @ after the host is fine");
 
+    g_context = "FB2KReplacedBy foobar2000";
+    CHECK(parseReplacedBy("{\"foobar2000\":\"2.27\"}", r, err) && r.name == "foobar2000" && r.foobar2000 == "2.27" && !r.hasSource && r.migration.empty() && r.team.empty(),
+          "foobar2000 version alone");
+    CHECK(parseReplacedBy("{\"foobar2000\":\"2.27\",\"migration_url\":\"https://example.org/foo_x#built-in\"}", r, err)
+          && r.name == kFoobar2000 && r.foobar2000 == "2.27" && r.migration == "https://example.org/foo_x#built-in", "migration_url is allowed");
+    CHECK(parseReplacedBy("{\"component\":\"foo_new\"}", r, err) && r.foobar2000.empty(), "a component successor has no foobar2000 version");
+    rejects("{\"component\":\"foo_new\",\"foobar2000\":\"2.27\"}", "use either \"component\" or \"foobar2000\"");
+    rejects("{\"migration_url\":\"https://example.org/\"}", "\"component\" or \"foobar2000\" is required");
+    rejects("{\"foobar2000\":\"two\"}", "\"foobar2000\" must be a version such as 2.27");
+    rejects("{\"foobar2000\":\"\"}", "\"foobar2000\" must be a version");
+    rejects("{\"foobar2000\":2.27}", "\"foobar2000\" must be a version");
+    rejects("{\"foobar2000\":\"2.27\",\"source\":\"github\"}", "\"foobar2000\" takes no source or team");
+    rejects("{\"foobar2000\":\"2.27\",\"owner\":\"o\"}", "\"foobar2000\" takes no source or team");
+    rejects("{\"foobar2000\":\"2.27\",\"repo\":\"r\"}", "\"foobar2000\" takes no source or team");
+    rejects("{\"foobar2000\":\"2.27\",\"url\":\"https://x.y/\"}", "\"foobar2000\" takes no source or team");
+    rejects("{\"foobar2000\":\"2.27\",\"team\":\"ABCDE12345\"}", "\"foobar2000\" takes no source or team");
+    rejects("{\"foobar2000\":\"2.27\",\"why\":\"x\"}", "unknown field \"why\"");
+    rejects("{\"foobar2000\":\"2.27\",\"migration_url\":\"http://x.y/\"}", "\"migration_url\"");
+    rejects("{\"component\":\"foobar2000\"}", "\"component\"");
+    rejects("{\"component\":\"FooBar2000.dll\"}", "\"component\"");
+    CHECK(foobar2000Includes("2.26.0.0", "2.0"), "a newer foobar2000 includes it");
+    CHECK(foobar2000Includes("2.26", "2.26"), "the same version includes it");
+    CHECK(!foobar2000Includes("2.26", "2.27"), "an older foobar2000 does not");
+    CHECK(!foobar2000Includes("2.26", "x"), "an unreadable declared version includes nothing");
+    CHECK(!foobar2000Includes("x", "2.26"), "an unreadable running version includes nothing");
+
     g_context = "lookup";
     std::map<std::string, Replacement> builtIn;
     Replacement listed;
@@ -63,6 +89,8 @@ int main() {
     CHECK(l.origin == ReplacementOrigin::BuiltIn && l.note.find("unknown field") != std::string::npos, "an invalid key is noted and the list is used");
     l = findReplacement("foo_x", true, "{\"component\":\"FOO_X\"}", builtIn);
     CHECK(l.origin == ReplacementOrigin::None && l.note.find("itself") != std::string::npos, "a component is not its own replacement");
+    l = findReplacement("foo_x", true, "{\"foobar2000\":\"2.27\"}", builtIn);
+    CHECK(l.origin == ReplacementOrigin::InfoPlist && l.replacement.name == kFoobar2000 && l.replacement.foobar2000 == "2.27", "foobar2000 as the replacement");
     l = findReplacement("foo_other", false, "", builtIn);
     CHECK(l.origin == ReplacementOrigin::None && l.note.empty(), "nothing declared");
     l = findReplacement("Core", true, "{\"component\":\"foo_new\"}", builtIn);
@@ -74,12 +102,15 @@ int main() {
         {"dll":"foo_b","replaced_by":{"component":"foo_c","source":"github","owner":"o","repo":"c"}},
         {"dll":"foo_d","replaced_by":{"component":"foo_e","source":"github"}},
         {"dll":"foo_f","replaced_by":{"component":"foo_f"}},
-        {"dll":"../x","replaced_by":{"component":"foo_g"}}],
+        {"dll":"../x","replaced_by":{"component":"foo_g"}},
+        {"dll":"foo_h","replaced_by":{"foobar2000":"2.27"}},
+        {"dll":"foo_i","replaced_by":{"foobar2000":"two"}}],
       "groups":[{"title":"Scrobbler","members":["foo_s1","FOO_S2.dll"]},
                 {"title":"Alone","members":["foo_s1"]},
                 {"title":"","members":["foo_s1","foo_s2"]},
                 {"title":"Bad","members":"foo_s1"}]})", builtIn, groups);
-    CHECK(builtIn.size() == 1 && builtIn.count("foo_b") && builtIn["foo_b"].source.repo == "c", "only valid replacements are kept");
+    CHECK(builtIn.size() == 2 && builtIn.count("foo_b") && builtIn["foo_b"].source.repo == "c", "only valid replacements are kept");
+    CHECK(builtIn.count("foo_h") && builtIn["foo_h"].name == kFoobar2000 && builtIn["foo_h"].foobar2000 == "2.27" && !builtIn["foo_h"].hasSource, "replaced by foobar2000 in the list");
     CHECK(groups.size() == 1 && groups[0].title == "Scrobbler" && groups[0].members.size() == 2 && groups[0].members[1] == "foo_s2", "only groups with a title and two members");
     parseBuiltInExtras("not json", builtIn, groups);
     CHECK(builtIn.empty() && groups.empty(), "unreadable list gives nothing");

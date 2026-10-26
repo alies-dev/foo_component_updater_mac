@@ -6,6 +6,7 @@
 
 #include "../fb2k_sdk.h"
 #include "../Core/mapping_validation.h"
+#include "../Core/replacement.h"
 #include "../UI/DebugSnapshot.h"
 #include "../upstream/update_check.h"
 
@@ -98,7 +99,9 @@ std::vector<MigrationNote> AppliedMigrationNotes() {
     std::lock_guard<std::mutex> lock(g_notesMutex);
     std::vector<MigrationNote> applied;
     for (auto& note : stored()) {
-        bool const done = loaded.count(fcu::normalizeComponentName(note.to)) && !loaded.count(fcu::normalizeComponentName(note.from));
+        // foobar2000 is no component: it replaced `from` once that is no longer loaded.
+        bool const successorLoaded = note.to == fcu::kFoobar2000 || loaded.count(fcu::normalizeComponentName(note.to));
+        bool const done = successorLoaded && !loaded.count(fcu::normalizeComponentName(note.from));
         bool const seen = std::any_of(applied.begin(), applied.end(), [&](MigrationNote const& n) { return lineOf(n) == lineOf(note); });
         if (done && !seen) applied.push_back(std::move(note));
     }
