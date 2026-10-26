@@ -93,7 +93,8 @@ def jenda_rows(rows, spectrum_latest):
     for name in JL[1:]:
         r = rows.get(name, {})
         check(f"{name} up to date", r.get("status") == "up_to_date", r)
-        print(f"INFO {name} installed by the batch: {known.get(name)}, reported: {r.get('installed')}")
+        if known:
+            check(f"{name} installed version equals the version the batch installed ({known.get(name)})", r.get("installed") == known.get(name), r)
 
 
 # GitHub release list requests (/repos/.../releases) each run must make: 2 checks' worth is a bug.

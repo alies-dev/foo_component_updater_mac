@@ -71,6 +71,7 @@ REPORTS="$HOME/Library/Logs/DiagnosticReports"
 FAILURES=0
 BATCH_PID=""   # pid of the foobar2000 this batch started; only that one is ever quit
 BACKUP_DONE=0
+PROFILE_MUTATED=0   # 1 from the first change to the profile on (the known-profile preparation)
 STUB_PID=""
 
 say() { echo "$*" | tee -a "$PROOF"; }
@@ -119,7 +120,12 @@ stop_stub() {
 restore_profile() {
     stop_stub
     if ! quit_fb2k; then
-        echo "foobar2000 did not quit; profile NOT restored. Backup: $BACKUP" >&2
+        if [ "$PROFILE_MUTATED" = 1 ]; then
+            fail "restore: foobar2000 did not quit; profile NOT restored. Backup: $BACKUP"
+            echo "foobar2000 did not quit; profile NOT restored. Backup: $BACKUP" >&2
+        else
+            say "INFO foobar2000 is running and was not started by this batch; the profile was never changed, so there is nothing to restore. Backup: $BACKUP"
+        fi
         return
     fi
     if [ "$BACKUP_DONE" = 1 ]; then
@@ -267,20 +273,30 @@ fi
 
 section "Prepare a known profile"
 JL_COMPONENTS="foo_jl_spectrum foo_jl_vectorscope foo_jl_simplaylist foo_jl_scrobble foo_jl_wave_seekbar"
-JENDA_RELEASES_URL="https://api.github.com/repos/JendaT/fb2k-components-mac-suite/releases?per_page=100"
+JENDA_API="https://api.github.com/repos/JendaT/fb2k-components-mac-suite/releases"
+SPECTRUM_PINNED_TAG="spectrum-v0.3.0"
 USER_COMPONENTS="$PROFILE/user-components"
-mkdir -p "$USER_COMPONENTS"
-find "$USER_COMPONENTS" -mindepth 1 -maxdepth 1 ! -name foo_component_updater_mac -exec rm -rf {} +
-say "PASS user-components holds only: $(ls -A "$USER_COMPONENTS" | tr '\n' ' ')(the Debug build replaces ours next)"
+export JL_COMPONENTS
 
 mkdir -p "$WORK/jenda"
 JENDA_PICKS="$WORK/jenda-picks.tsv"
-if curl -sf -o "$WORK/jenda-releases.json" "$JENDA_RELEASES_URL"; then
-    python3 - "$WORK/jenda-releases.json" $JL_COMPONENTS > "$JENDA_PICKS" <<'PY'
-import json, re, sys
+: > "$JENDA_PICKS"
+JENDA_PICK_RC=1
+# The pinned Spectrum release is fetched by its tag, whatever number of releases came after it. The newest release of the
+# other four (and Spectrum's newest) is looked for in the list, newest first, 100 per page, at most 3 pages.
+# Transient GitHub errors (a dropped connection, a short 5xx or 403 burst) are retried; a run once lost the pinned release to one.
+curl -sf --retry 3 --retry-all-errors --retry-delay 2 -o "$WORK/jenda-pinned.json" "$JENDA_API/tags/$SPECTRUM_PINNED_TAG" || rm -f "$WORK/jenda-pinned.json"
+JENDA_PAGES=""
+for page in 1 2 3; do
+    curl -sf --retry 3 --retry-all-errors --retry-delay 2 -o "$WORK/jenda-releases-$page.json" "$JENDA_API?per_page=100&page=$page" || break
+    JENDA_PAGES="$JENDA_PAGES $WORK/jenda-releases-$page.json"
+    python3 - "$WORK/jenda-pinned.json" $JENDA_PAGES > "$JENDA_PICKS" 2> "$WORK/jenda-picks.err" <<'PY'
+import json, os, re, sys
 
-releases = json.load(open(sys.argv[1]))
-components = sys.argv[2:]
+pinned_file, page_files = sys.argv[1], sys.argv[2:]
+pinned = json.load(open(pinned_file)) if os.path.exists(pinned_file) else None
+releases = [r for f in page_files for r in json.load(open(f))]  # newest first
+components = os.environ["JL_COMPONENTS"].split()
 missing = []
 
 def version(tag):
@@ -297,15 +313,16 @@ def stable(release):
     return not release.get("draft") and not release.get("prerelease")
 
 def newest(component):
-    # The list is newest first.
     return next((r for r in releases if stable(r) and asset(r, component) and version(r["tag_name"])), None)
 
 latest = newest("foo_jl_spectrum")
 if latest:
     print("latest\tfoo_jl_spectrum\t" + version(latest["tag_name"]) + "\t" + asset(latest, "foo_jl_spectrum"))
+else:
+    missing.append("foo_jl_spectrum (newest)")
 for c in components:
     if c == "foo_jl_spectrum":
-        r = next((r for r in releases if not r.get("draft") and asset(r, c) and version(r["tag_name"]) == "0.3.0"), None)
+        r = pinned if pinned and not pinned.get("draft") and asset(pinned, c) and version(pinned["tag_name"]) == "0.3.0" else None
     else:
         r = newest(c)
     if r is None:
@@ -317,11 +334,12 @@ if missing:
     sys.exit(1)
 PY
     JENDA_PICK_RC=$?
-else
-    : > "$JENDA_PICKS"
-    JENDA_PICK_RC=1
-fi
+    [ "$JENDA_PICK_RC" -eq 0 ] && break
+done
+# The newest Spectrum release is optional (unknown without GitHub); the five picks are what the download needs.
+if [ "$(grep -c '^pick' "$JENDA_PICKS")" -eq 5 ]; then JENDA_PICK_RC=0; else JENDA_PICK_RC=1; fi
 if [ -z "${JENDA_PACKAGES:-}" ] && [ "$JENDA_PICK_RC" -ne 0 ]; then
+    [ -s "$WORK/jenda-picks.err" ] && cat "$WORK/jenda-picks.err" >&2
     fail "known profile: could not pick the JendaT releases (GitHub unreachable, or an asset is missing); set JENDA_PACKAGES to use local packages"
     exit 1
 fi
@@ -345,8 +363,6 @@ for c in $JL_COMPONENTS; do
     fi
     [ -n "$ver" ] || { fail "known profile: no version for $c"; exit 1; }
     echo "$ver" > "$WORK/jenda/$c.version"
-    mkdir -p "$USER_COMPONENTS/$c"
-    cp -R "$WORK/jenda/$c/mac/$c.component" "$USER_COMPONENTS/$c/"
 done
 [ "$(cat "$WORK/jenda/foo_jl_spectrum.version")" = "0.3.0" ] || { fail "known profile: foo_jl_spectrum is $(cat "$WORK/jenda/foo_jl_spectrum.version"), not 0.3.0"; exit 1; }
 
@@ -362,6 +378,22 @@ print(json.dumps(known))
 PY
 say "PASS known profile: $(cat "$WORK/known-profile.json") ($([ -n "${JENDA_PACKAGES:-}" ] && echo "packages from $JENDA_PACKAGES" || echo "GitHub releases of JendaT/fb2k-components-mac-suite"))"
 [ -n "$SPECTRUM_LATEST" ] || say "INFO newest foo_jl_spectrum release unknown (GitHub not reachable); the real run cannot be checked"
+
+# Everything above only downloaded and unpacked into $WORK. This is the last check before the first change to the profile:
+# a foobar2000 started in the meantime was not started by this batch, so nothing is touched. The exit trap sees the
+# untouched profile (PROFILE_MUTATED=0) and has nothing to restore.
+if [ -n "$(fb2k_pid)" ]; then
+    fail "known profile: foobar2000 (pid $(fb2k_pid)) started while the packages were prepared and was not started by this batch; the profile was not changed"
+    exit 3
+fi
+PROFILE_MUTATED=1
+mkdir -p "$USER_COMPONENTS"
+find "$USER_COMPONENTS" -mindepth 1 -maxdepth 1 ! -name foo_component_updater_mac -exec rm -rf {} +
+for c in $JL_COMPONENTS; do
+    mkdir -p "$USER_COMPONENTS/$c"
+    cp -R "$WORK/jenda/$c/mac/$c.component" "$USER_COMPONENTS/$c/"
+done
+say "PASS user-components holds: $(ls -A "$USER_COMPONENTS" | tr '\n' ' ')(only the five JendaT components and the updater; the Debug build replaces ours next)"
 
 # Every setting of ours at its default: the rows of the settings, the periodic check, the notes and the debug keys.
 # foobar2000 stores a cfg_var under the GUID in uppercase; the last run time (A3C8E6D1-...) is set by the scenarios.
