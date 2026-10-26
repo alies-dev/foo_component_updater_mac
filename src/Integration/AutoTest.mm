@@ -531,6 +531,9 @@ public:
         pfc::string8 pathValue = fb2k::configStore::get()->getConfigString("foo_component_updater_mac.debug.autotest")->c_str();
         if (pathValue.length() == 0) return;
         std::string path = pathValue.c_str();
+        // The batch starts foobar2000 with `open -g`, but main_restart() relaunches it in front: step back so the
+        // person at the machine keeps working in their own app.
+        [NSApp hide:nil];
         pfc::string8 scenario = fb2k::configStore::get()->getConfigString("foo_component_updater_mac.debug.m2")->c_str();
         if (scenario.length() > 0) {
             runInstallScenario(path, scenario.c_str());
