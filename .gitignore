@@ -5,3 +5,4 @@ DerivedData/
 *.xcodeproj/
 *.component
 *.fb2k-component
+__pycache__/
