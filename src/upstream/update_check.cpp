@@ -150,7 +150,6 @@ void FinishReplacement(CheckResult& r) {
         r.errorMessage += " (while checking " + r.replacedBy + ", which replaces this component)";
         return;
     }
-    if (r.status == UpdateStatus::NoSource) AddNote(r, "No source of " + r.replacedBy + " was found.");
     r.status = UpdateStatus::Replaced;
 }
 
@@ -180,15 +179,14 @@ void ApplyGitHubOutcome(CheckResult& r, fcu::AssetOutcome const& o) {
 // foobar2000.org のコンポーネントカタログ(ファイル名がそのままキー)
 // ------------------------------------------------------------------
 
-// `name` is the catalog key: the component's file name, or that of its replacement.
-void CheckCatalog(CheckResult& r, std::string const& name, abort_callback& abort) {
+void CheckCatalog(CheckResult& r, abort_callback& abort) {
     r.errorMessage.clear();
-    if (name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._+-") != std::string::npos) {
+    if (r.dllName.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._+-") != std::string::npos) {
         r.status = UpdateStatus::NoSource;
         AddNote(r, "The file name cannot be a catalog key.");
         return;
     }
-    std::string path = "/components/view/" + name;
+    std::string path = "/components/view/" + r.dllName;
     std::string pageUrl = std::string(k_catalogBase) + path;
     std::string body;
     fcu::HttpMeta meta;
@@ -313,8 +311,8 @@ void RunChecks(
         RepositoryMappingEntry entry;
         fcu::SourceOrigin origin;
         bool isCatalog;
-        std::string key;  // asset and catalog key: the component's file name, or its replacement's
-        bool replacement; // the row shows the replacement's release (FinishReplacement)
+        std::string key;  // asset key: the component's file name, or its replacement's
+        bool replacement; // the row shows the replacement's release (FinishReplacement); never falls through to the catalog
     };
     std::vector<Job> jobs;
 
@@ -349,7 +347,7 @@ void RunChecks(
                 ? ", as this component declares." : ", according to the built in list of this updater."));
             AddNote(r, rl.note);
             r.status = UpdateStatus::Replaced;
-            auto present = installedVersions.find(r.replacedBy);
+            auto present = installedVersions.find(fcu::normalizeComponentName(r.replacedBy));
             if (present != installedVersions.end()) {
                 r.replacementInstalled = true;
                 r.latestVersion = present->second;
@@ -480,8 +478,8 @@ void RunChecks(
         if (!job.isCatalog) continue;
         if (abort.is_aborting()) return;
         CheckResult& r = results[job.row];
-        say("Checking " + (job.replacement ? job.key : r.displayName) + " in the foobar2000.org catalog...");
-        CheckCatalog(r, job.key, abort);
+        say("Checking " + r.displayName + " in the foobar2000.org catalog...");
+        CheckCatalog(r, abort);
     }
 
     for (auto const& job : jobs) {

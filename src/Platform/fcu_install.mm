@@ -396,17 +396,15 @@ InstallOutcome switchComponent(std::string const& name, std::string const& repla
         // Switching to a component that goes at the next start would remove both.
         require(!isRemovalStaged(replacement), "The replacement is waiting to be removed; restart foobar2000 first.");
         // The caller decides (the check knows what foobar2000 loaded): no url means the successor is installed or
-        // staged already and only the removal is left; otherwise the package is staged over whatever is on disk.
+        // staged already and only the removal is left; otherwise its package is downloaded and staged.
         bool const stageNew = !url.empty();
-        if (stageNew) {
+        if (!stageNew) {
+            require(isDirectory(bundleIn(userComponentsDir(), replacement)) || isStaged(replacement), "The replacement offers no package to install.");
+        } else {
             require(lstat(newTarget.fileSystemRepresentation, &st) != 0, "foobar2000 has a pending change for the replacement; restart foobar2000 first.");
             // On disk but not loaded (the check found no such component): staging would replace it without a backup.
             require(lstat(join(userComponentsDir(), ns(replacement)).fileSystemRepresentation, &st) != 0,
                     "A folder for the replacement exists but foobar2000 did not load it; remove it first.");
-        } else {
-            require(isDirectory(bundleIn(userComponentsDir(), replacement)) || isStaged(replacement), "The replacement offers no package to install.");
-        }
-        if (stageNew) {
             extractPackage(job, replacement, url, abort);
             sanitize(job.stagedAs(replacement));
             // A different product, so no bundle identifier to compare. The developer is pinned: the declared Team ID, or else the

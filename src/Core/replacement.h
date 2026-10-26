@@ -10,9 +10,9 @@ namespace fcu {
 
 // The component that took over from an installed one.
 struct Replacement {
-    std::string name;              // normalized file name of the successor
+    std::string name;              // file name of the successor as declared (case kept, no ".dll"); compare normalized
     bool hasSource = false;        // where its updates live was declared with it
-    RepositoryMappingEntry source; // when hasSource; source.dllName == name
+    RepositoryMappingEntry source; // when hasSource; source.dllName is the normalized name
     std::string migration;         // https page with migration notes, "" when none
     std::string team;              // Team ID the successor must be signed with, "" when not declared
 };

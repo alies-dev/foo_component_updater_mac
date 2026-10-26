@@ -115,6 +115,9 @@ int main() {
         {"component":"foo_d","dll":"foo_x","source":"github","owner":"o","repo":"d"}]})", reg), "component and dll entries");
     CHECK(reg.size() == 3 && reg[0].dllName == "foo_a" && reg[1].dllName == "foo_b" && reg[2].dllName == "foo_c",
           "\"component\" names an entry, the older \"dll\" still does, two different names drop it");
+    CHECK(!parseRegistryJson(R"({"components":[{"dll":42,"source":"github","owner":"o","repo":"r"}]})", reg)
+          && !parseRegistryJson(R"({"components":[{"component":["x"],"source":"github","owner":"o","repo":"r"}]})", reg),
+          "a name that is not a string rejects the whole list, as before");
 
     g_context = "built in list file";
     std::string extra;

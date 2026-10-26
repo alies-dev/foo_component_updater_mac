@@ -82,7 +82,7 @@ bool successorPresent(CheckResult const& r) {
 @property (copy) NSDate *releasedDate; // nil when unknown; sort key of the Released column
 @property NSInteger statusOrder;       // statusRank; sort key of the Status column
 @property (copy) NSString *name, *blockReason, *backupVersion; // file name, why not installable ("" when it is), backup version ("" when none)
-@property (copy) NSString *replacedBy, *replacementOrigin, *overlap; // see CheckResult; "" when none
+@property (copy) NSString *replacedBy, *overlap; // see CheckResult; "" when none
 @property UpdateStatus statusCode;
 @property BOOL staged, failed, replacementInstalled, kept;
 @end
@@ -147,11 +147,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     NSMutableArray<NSString *> *failed = [NSMutableArray array];
     int staged = 0;
     for (size_t i = 0; i < jobs.size(); ++i) {
-        if (outcomes[i].ok) {
-            ++staged;
-            if (!jobs[i].replacement.empty() && !jobs[i].migration.empty()) RememberMigrationNote({jobs[i].name, jobs[i].replacement, jobs[i].migration});
-            continue;
-        }
+        if (outcomes[i].ok) { ++staged; continue; }
         failures[ns(jobs[i].name)] = ns(outcomes[i].message);
         [failed addObject:[NSString stringWithFormat:@"%@: %@", ns(jobs[i].name), ns(outcomes[i].message)]];
     }
@@ -401,7 +397,6 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.releaseUrl = [ns(r->releaseUrl) hasPrefix:@"https://"] ? ns(r->releaseUrl) : @"";
         row.name = ns(r->dllName);
         row.replacedBy = ns(r->replacedBy);
-        row.replacementOrigin = ns(r->replacementOrigin);
         row.replacementInstalled = successorPresent(*r);
         row.kept = r->kept;
         row.staged = fcu::isStaged(r->dllName) || fcu::isRemovalStaged(r->dllName);
@@ -567,6 +562,8 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
             outcomes.push_back(!op.replacement.empty() ? fcu::switchComponent(op.name, op.replacement, op.url, op.team, abort)
                                : op.url.empty() ? fcu::restorePrevious(op.name, op.installedVersion, abort)
                                                 : fcu::installUpdate(op.name, op.installedVersion, op.url, abort));
+            // Right away, not in finishOperation: quitting during a later download must not lose the note of a staged switch.
+            if (outcomes.back().ok && !op.replacement.empty() && !op.migration.empty()) RememberMigrationNote({op.name, op.replacement, op.migration});
         }
         outcomes.resize(jobs.size());
         fb2k::inMainThread([jobs, outcomes] { finishOperation(jobs, outcomes); });

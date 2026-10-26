@@ -177,9 +177,9 @@ def m2(run, log, previous_pid):
         ng = log["replacement_before"]
         check("after the restart foo_abx is gone and foo_abx_ng 2.2.3 runs, nothing pending",
               (before["installed_version"], before["removal_staged"], ng["installed_version"], ng["staged"]) == ("", False, "2.2.3", False), log)
-        check("the migration notes of the applied switch are offered once",
+        check("the migration notes of the applied switch are kept until offered, then gone",
               log["migration_notes"] == [{"from": "foo_abx", "to": "foo_abx_ng", "url": "https://github.com/fcu-test/foo_abx_ng#migrating"}]
-              and log["migration_notes_again"] == 0, log)
+              and log["migration_notes_kept_until_offered"] == 1 and log["migration_notes_again"] == 0, log)
     sys.exit(1 if failures else 0)
 
 

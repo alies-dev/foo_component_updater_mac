@@ -470,11 +470,14 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             (*log)["after"] = stateOf(name);
             if (switching) (*log)["replacement_after"] = stateOf("foo_abx_ng");
             if (scenario == "switch-after") {
-                // Offered once: the second take finds nothing.
+                // The note stays until it was offered (a quit before that keeps it), then it is gone.
                 json notes = json::array();
-                for (auto const& n : TakeAppliedMigrationNotes()) notes.push_back({{"from", n.from}, {"to", n.to}, {"url", n.url}});
+                std::vector<MigrationNote> const applied = AppliedMigrationNotes();
+                for (auto const& n : applied) notes.push_back({{"from", n.from}, {"to", n.to}, {"url", n.url}});
                 (*log)["migration_notes"] = notes;
-                (*log)["migration_notes_again"] = TakeAppliedMigrationNotes().size();
+                (*log)["migration_notes_kept_until_offered"] = AppliedMigrationNotes().size();
+                for (auto const& n : applied) ForgetMigrationNote(n);
+                (*log)["migration_notes_again"] = AppliedMigrationNotes().size();
             }
             if (scenario == "refuse") {
                 bool withBackup = false, without = true;

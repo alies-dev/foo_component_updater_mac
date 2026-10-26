@@ -19,7 +19,8 @@ int main() {
     std::string err;
 
     g_context = "FB2KReplacedBy";
-    CHECK(parseReplacedBy("{\"component\":\"Foo_New.dll\"}", r, err) && r.name == "foo_new" && !r.hasSource && r.migration.empty() && r.team.empty(), "name only");
+    CHECK(parseReplacedBy("{\"component\":\"Foo_New.dll\"}", r, err) && r.name == "Foo_New" && !r.hasSource && r.migration.empty() && r.team.empty(),
+          "name only: case kept (it names the package and folders), \".dll\" dropped");
     CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\"}", r, err), "with a source");
     CHECK(r.hasSource && r.source.dllName == "foo_new" && r.source.source == "github" && r.source.owner == "o" && r.source.repo == "r", "source belongs to the successor");
     CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"source\":\"hyv\",\"url\":\"https://foobar.hyv.fi/?view=foo_new\"}", r, err) && r.source.url.size(), "url source");

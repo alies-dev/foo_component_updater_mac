@@ -47,7 +47,9 @@ bool parseObject(nlohmann::json const& obj, Replacement& out, std::string& error
         return false;
     }
     Replacement r;
-    r.name = normalizeComponentName(component->get<std::string>());
+    // As declared: it names the package and the folders, which are case sensitive. Only a ".dll" suffix goes.
+    r.name = component->get<std::string>();
+    if (normalizeComponentName(r.name).size() < r.name.size()) r.name.resize(r.name.size() - 4);
     nlohmann::json fields = obj;
     fields.erase("component");
     if (auto m = fields.find("migration_url"); m != fields.end()) {
@@ -104,10 +106,14 @@ void parseBuiltInExtras(std::string const& text, std::map<std::string, Replaceme
     if (components != parsed.end() && components->is_array()) {
         for (auto const& item : *components) {
             if (!item.is_object() || !item.contains("replaced_by")) continue;
-            std::string name = normalizeComponentName(listEntryName(item));
             Replacement r;
-            std::string error;
-            if (isComponentName(name) && parseObject(item["replaced_by"], r, error) && r.name != name) replacements.emplace(name, std::move(r));
+            std::string name, error;
+            try {
+                name = normalizeComponentName(listEntryName(item));
+            } catch (std::exception const&) {
+                continue;
+            }
+            if (isComponentName(name) && parseObject(item["replaced_by"], r, error) && normalizeComponentName(r.name) != name) replacements.emplace(name, std::move(r));
         }
     }
 
@@ -136,7 +142,7 @@ ReplacementLookup findReplacement(std::string const& fileName, bool plistPresent
         std::string error;
         if (!parseReplacedBy(plistJson, declared, error)) {
             r.note = error;
-        } else if (declared.name == name) {
+        } else if (normalizeComponentName(declared.name) == name) {
             r.note = "Invalid FB2KReplacedBy: \"component\" names the component itself";
         } else {
             r.origin = ReplacementOrigin::InfoPlist;
