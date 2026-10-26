@@ -159,7 +159,7 @@ bool confirmsModally() {
 - (NSMenuItem *)keepItemForRow:(FCUUpdateRow *)row;
 #ifdef FCU_DEBUG_HOOKS
 - (NSMenuItem *)debugRestoreItemForName:(NSString *)name;
-- (void)debugCheckFirstInstallable;
+- (void)debugCheckFirstInstallable:(BOOL)switchesOnly;
 #endif
 @end
 
@@ -588,9 +588,10 @@ bool confirmsModally() {
     return nil;
 }
 
-- (void)debugCheckFirstInstallable {
+// The first installable row, or with switchesOnly the first installable Replaced row (an update listed above it is skipped).
+- (void)debugCheckFirstInstallable:(BOOL)switchesOnly {
     for (FCUUpdateRow *row in _rows) {
-        if (row.blockReason.length != 0) continue;
+        if (row.blockReason.length != 0 || (switchesOnly && row.statusCode != UpdateStatus::Replaced)) continue;
         [_checked addObject:row.file];
         [[NSNotificationCenter defaultCenter] postNotificationName:kRowsChanged object:self];
         return;
@@ -975,7 +976,7 @@ long DebugSnapshotUpdatesPage(std::vector<CheckResult> const& results, bool show
     bool saved = GetShowBuiltInComponents();
     SetShowBuiltInComponents(showBuiltIn);
     FCUUpdatesModel *scratch = scratchModel(results);
-    [scratch debugCheckFirstInstallable];
+    [scratch debugCheckFirstInstallable:NO];
     FCUPreferencesController *prefs = [[FCUPreferencesController alloc] init];
     {
         ScopedModel scope(scratch);
@@ -994,7 +995,7 @@ long DebugSnapshotUpdatesPage(std::vector<CheckResult> const& results, bool show
 
 std::string DebugSnapshotSwitchConfirmation(std::vector<CheckResult> const& results, const char* pngPath) {
     FCUUpdatesModel *scratch = scratchModel(results);
-    [scratch debugCheckFirstInstallable];
+    [scratch debugCheckFirstInstallable:YES];
     NSAlert *alert = [scratch switchConfirmation];
     if (!alert) return "";
     [alert layout];
