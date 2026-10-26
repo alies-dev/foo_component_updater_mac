@@ -2,16 +2,15 @@
 
 #include <string>
 
-// コンポーネント(DLL名)と更新元の対応付け。Info.plist、Remote Registry、
-// 同梱リスト、公式カタログのいずれから得たものもこの形で扱う。
+// Where a component (by file name) gets its updates. Info.plist, the remote
+// registry, the built in list and the official catalog all produce this form.
 
 struct RepositoryMappingEntry {
-    std::string dllName;  // 拡張子(.dll)の有無は問わない。比較時に正規化する。
-    std::string source;   // "github" / "gitlab" / "codeberg" / "marc2k3" / "sourceforge" / "hyv"。
-    std::string owner;    // owner/repoモデル(github/gitlab/codeberg)用。
-                           // marc2k3では未使用(空文字)。
-    std::string repo;     // owner/repoモデル(github/gitlab/codeberg)用。
-                           // marc2k3では未使用(空文字)。
-    std::string url;      // urlモデル(marc2k3)用。コンポーネント個別ページのURLを
-                           // そのまま保持する。github/gitlab/codebergでは未使用(空文字)。
+    std::string dllName;  // With or without ".dll"; normalized before comparing.
+    std::string source;   // "github" / "gitlab" / "codeberg" / "marc2k3" / "sourceforge" / "hyv",
+                          // or "catalog" for the official catalog.
+    std::string owner;    // github, gitlab and codeberg only; empty for url sources.
+    std::string repo;     // github, gitlab and codeberg only; empty for url sources.
+    std::string url;      // marc2k3, sourceforge and hyv only: the https URL of the component's
+                          // page, kept as is. Empty for github, gitlab and codeberg.
 };

@@ -76,7 +76,7 @@ All files:
 
 `remote_registry.h`, `automatic_check.h`: include path only (or nothing).
 
-`repository_mapping.h` keeps only `RepositoryMappingEntry`; the user mapping storage (`repository_mapping.cpp`) is not ported.
+`repository_mapping.h` keeps only `RepositoryMappingEntry`, with English comments; the user mapping storage (`repository_mapping.cpp`) is not ported.
 
 `automatic_check.cpp`:
 
