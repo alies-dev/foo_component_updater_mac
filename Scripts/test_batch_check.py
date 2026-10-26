@@ -2,9 +2,12 @@
 """Assertions for the M1 batch (Scripts/test_batch.sh). Prints PASS/FAIL per check.
 
 Usage: test_batch_check.py <run> <autotest.json> [<stub.log>]
+Environment: KNOWN_PROFILE, the known-profile.json the batch wrote (the versions it installed; foo_jl_spectrum_latest is the
+newest Spectrum release on GitHub, which the real run must report as available)
 Runs: real, stub, down, ratelimit, badregistry, triggers
 """
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -71,16 +74,26 @@ FRESH = {"auto_check": True, "interval_days": 7, "include_prereleases": False}
 PERSISTED = {"auto_check": True, "interval_days": 11, "include_prereleases": True}
 
 
-def jenda_rows(rows):
+def known_profile():
+    path = os.environ.get("KNOWN_PROFILE")
+    if not path or not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def jenda_rows(rows, spectrum_latest):
+    known = known_profile()
     for name in JL:
         r = rows.get(name)
         check(f"{name} present and resolved through the built in list", r is not None and r["origin"] == "built in list", r)
     s = rows.get("foo_jl_spectrum", {})
-    check("Spectrum 0.3.0 reports 1.0.0 available",
-          s.get("installed") == "0.3.0" and s.get("latest") == "1.0.0" and s.get("status") == "update_available", s)
+    check(f"Spectrum 0.3.0 reports {spectrum_latest} available",
+          s.get("installed") == "0.3.0" and s.get("latest") == spectrum_latest and s.get("status") == "update_available", s)
     for name in JL[1:]:
         r = rows.get(name, {})
         check(f"{name} up to date", r.get("status") == "up_to_date", r)
+        print(f"INFO {name} installed by the batch: {known.get(name)}, reported: {r.get('installed')}")
 
 
 # GitHub release list requests (/repos/.../releases) each run must make: 2 checks' worth is a bug.
@@ -234,7 +247,9 @@ def main():
 
     if run == "real":
         check("settings at start are the defaults", log["settings_at_start"] == FRESH, log["settings_at_start"])
-        jenda_rows(rows)
+        latest = known_profile().get("foo_jl_spectrum_latest")
+        check("the batch recorded the newest foo_jl_spectrum release (known-profile.json)", bool(latest), os.environ.get("KNOWN_PROFILE"))
+        jenda_rows(rows, latest)
         jenda = [u for u in requests if "/repos/JendaT/fb2k-components-mac-suite/releases" in u]
         github = [u for u in requests if u.startswith("https://api.github.com/")]
         check("exactly 1 GitHub API request for the 5 JendaT components", len(jenda) == 1, jenda)
@@ -243,7 +258,7 @@ def main():
               all(u.startswith(("https://api.github.com/", "https://raw.githubusercontent.com/", "https://www.foobar2000.org/")) for u in requests), requests)
     elif run == "stub":
         check("settings persisted across the restart", log["settings_at_start"] == PERSISTED, log["settings_at_start"])
-        jenda_rows(rows)
+        jenda_rows(rows, "1.0.0")  # the stub fixture's latest
         abx = rows.get("foo_abx", {})
         check("older foo_abx resolved through the catalog", abx.get("origin") == "catalog", abx)
         check("foo_abx reports the current catalog version",

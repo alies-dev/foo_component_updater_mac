@@ -66,7 +66,7 @@ long DebugUpdatesPageRowsBeforeCheck(bool showBuiltIn);
 // (-1 when the file could not be written).
 long DebugSnapshotUpdatesPage(std::vector<CheckResult> const& results, bool showBuiltIn, const char* pngPath);
 
-// Ticks the first installable row and renders the switch confirmation it would ask for (PNG); returns its title, text
-// and links ("" when that row is no switch).
+// Ticks the first installable Replaced row and renders the switch confirmation it would ask for (PNG); returns its
+// title, text and links ("" when there is no such row).
 std::string DebugSnapshotSwitchConfirmation(std::vector<CheckResult> const& results, const char* pngPath);
 #endif

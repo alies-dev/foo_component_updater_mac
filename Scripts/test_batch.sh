@@ -29,13 +29,19 @@
 #   m2-core      foo_abx declares FB2KReplacedBy foobar2000 2.0: the row is Replaced (not for a pretend older foobar2000), Install stages only
 #                the removal; after the restart foo_abx is gone and its migration notes are offered once
 #
+# Known profile: whatever the user has installed or toggled, the batch runs against the same one. Right after the backup
+# every user component except the updater is removed and JendaT's five (foo_jl_spectrum 0.3.0, the other four in their newest
+# GitHub release) are installed from JendaT's GitHub releases; our own settings rows (and the debug keys) are deleted so every
+# setting is at its default. The versions picked go to $WORK/known-profile.json for the checker. The exit restores the profile.
+#
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
 # (verified with diff -rq); foobar2000 is started only with `open -g -a foobar2000`,
 # never activated, and quit with osascript.
 #
 # Environment: FB2K_SDK_PATH (SDK location), FOO_ABX_PACKAGE (a local copy of the foo_abx package
-# from the catalog, used instead of downloading it), PROOF_OUT (where to copy the proof log,
-# default build/<batch>-proof.md).
+# from the catalog, used instead of downloading it), JENDA_PACKAGES (a folder with the five JendaT
+# <component>.fb2k-component files, used instead of downloading them; versions are read from the bundles,
+# foo_jl_spectrum must be 0.3.0), PROOF_OUT (where to copy the proof log, default build/<batch>-proof.md).
 
 set -uo pipefail
 
@@ -201,7 +207,7 @@ start_run() {
 check_run() {
     local name="$1" stub_log="${2:-}"
     section "Run $name: checks"
-    python3 "$SCRIPT_DIR/test_batch_check.py" "$name" "$WORK/run-$name.json" $stub_log > "$WORK/check-$name.txt"
+    KNOWN_PROFILE="$WORK/known-profile.json" python3 "$SCRIPT_DIR/test_batch_check.py" "$name" "$WORK/run-$name.json" $stub_log > "$WORK/check-$name.txt"
     local rc=$?
     fence < "$WORK/check-$name.txt"
     grep -E '^(FAIL|INFO)' "$WORK/check-$name.txt"
@@ -258,6 +264,111 @@ else
     echo "backup differs from the profile; aborting" >&2
     exit 2
 fi
+
+section "Prepare a known profile"
+JL_COMPONENTS="foo_jl_spectrum foo_jl_vectorscope foo_jl_simplaylist foo_jl_scrobble foo_jl_wave_seekbar"
+JENDA_RELEASES_URL="https://api.github.com/repos/JendaT/fb2k-components-mac-suite/releases?per_page=100"
+USER_COMPONENTS="$PROFILE/user-components"
+mkdir -p "$USER_COMPONENTS"
+find "$USER_COMPONENTS" -mindepth 1 -maxdepth 1 ! -name foo_component_updater_mac -exec rm -rf {} +
+say "PASS user-components holds only: $(ls -A "$USER_COMPONENTS" | tr '\n' ' ')(the Debug build replaces ours next)"
+
+mkdir -p "$WORK/jenda"
+JENDA_PICKS="$WORK/jenda-picks.tsv"
+if curl -sf -o "$WORK/jenda-releases.json" "$JENDA_RELEASES_URL"; then
+    python3 - "$WORK/jenda-releases.json" $JL_COMPONENTS > "$JENDA_PICKS" <<'PY'
+import json, re, sys
+
+releases = json.load(open(sys.argv[1]))
+components = sys.argv[2:]
+missing = []
+
+def version(tag):
+    m = re.search(r"-v(\d+(?:\.\d+)*[^/]*)$", tag)
+    return m.group(1) if m else None
+
+def asset(release, component):
+    for a in release.get("assets", []):
+        if a["name"] == component + ".fb2k-component":
+            return a["browser_download_url"]
+    return None
+
+def stable(release):
+    return not release.get("draft") and not release.get("prerelease")
+
+def newest(component):
+    # The list is newest first.
+    return next((r for r in releases if stable(r) and asset(r, component) and version(r["tag_name"])), None)
+
+latest = newest("foo_jl_spectrum")
+if latest:
+    print("latest\tfoo_jl_spectrum\t" + version(latest["tag_name"]) + "\t" + asset(latest, "foo_jl_spectrum"))
+for c in components:
+    if c == "foo_jl_spectrum":
+        r = next((r for r in releases if not r.get("draft") and asset(r, c) and version(r["tag_name"]) == "0.3.0"), None)
+    else:
+        r = newest(c)
+    if r is None:
+        missing.append(c)
+    else:
+        print("pick\t" + c + "\t" + version(r["tag_name"]) + "\t" + asset(r, c))
+if missing:
+    sys.stderr.write("no suitable release asset for: " + ", ".join(missing) + "\n")
+    sys.exit(1)
+PY
+    JENDA_PICK_RC=$?
+else
+    : > "$JENDA_PICKS"
+    JENDA_PICK_RC=1
+fi
+if [ -z "${JENDA_PACKAGES:-}" ] && [ "$JENDA_PICK_RC" -ne 0 ]; then
+    fail "known profile: could not pick the JendaT releases (GitHub unreachable, or an asset is missing); set JENDA_PACKAGES to use local packages"
+    exit 1
+fi
+
+for c in $JL_COMPONENTS; do
+    pkg="$WORK/jenda/$c.fb2k-component"
+    if [ -n "${JENDA_PACKAGES:-}" ]; then
+        [ -f "$JENDA_PACKAGES/$c.fb2k-component" ] || { fail "known profile: $JENDA_PACKAGES/$c.fb2k-component is missing"; exit 1; }
+        cp "$JENDA_PACKAGES/$c.fb2k-component" "$pkg"
+    else
+        url="$(awk -F'\t' -v c="$c" '$1 == "pick" && $2 == c { print $4 }' "$JENDA_PICKS")"
+        [ -n "$url" ] || { fail "known profile: no release asset $c.fb2k-component"; exit 1; }
+        curl -sfL -o "$pkg" "$url" || { fail "known profile: download of $url failed"; exit 1; }
+    fi
+    unzip -q -o "$pkg" 'mac/*' -d "$WORK/jenda/$c" && [ -d "$WORK/jenda/$c/mac/$c.component" ] || { fail "known profile: $c.fb2k-component has no mac/$c.component"; exit 1; }
+    xattr -cr "$WORK/jenda/$c/mac/$c.component"
+    if [ -n "${JENDA_PACKAGES:-}" ]; then
+        ver="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$WORK/jenda/$c/mac/$c.component/Contents/Info.plist" 2>/dev/null)"
+    else
+        ver="$(awk -F'\t' -v c="$c" '$1 == "pick" && $2 == c { print $3 }' "$JENDA_PICKS")"
+    fi
+    [ -n "$ver" ] || { fail "known profile: no version for $c"; exit 1; }
+    echo "$ver" > "$WORK/jenda/$c.version"
+    mkdir -p "$USER_COMPONENTS/$c"
+    cp -R "$WORK/jenda/$c/mac/$c.component" "$USER_COMPONENTS/$c/"
+done
+[ "$(cat "$WORK/jenda/foo_jl_spectrum.version")" = "0.3.0" ] || { fail "known profile: foo_jl_spectrum is $(cat "$WORK/jenda/foo_jl_spectrum.version"), not 0.3.0"; exit 1; }
+
+# The newest Spectrum release is what the real run must report as available. Without GitHub (JENDA_PACKAGES only) it is unknown.
+SPECTRUM_LATEST="$(awk -F'\t' '$1 == "latest" { print $3 }' "$JENDA_PICKS")"
+python3 - "$WORK" "$SPECTRUM_LATEST" $JL_COMPONENTS > "$WORK/known-profile.json" <<'PY'
+import json, sys
+work, latest, components = sys.argv[1], sys.argv[2], sys.argv[3:]
+known = {c: open(f"{work}/jenda/{c}.version").read().strip() for c in components}
+if latest:
+    known["foo_jl_spectrum_latest"] = latest
+print(json.dumps(known))
+PY
+say "PASS known profile: $(cat "$WORK/known-profile.json") ($([ -n "${JENDA_PACKAGES:-}" ] && echo "packages from $JENDA_PACKAGES" || echo "GitHub releases of JendaT/fb2k-components-mac-suite"))"
+[ -n "$SPECTRUM_LATEST" ] || say "INFO newest foo_jl_spectrum release unknown (GitHub not reachable); the real run cannot be checked"
+
+# Every setting of ours at its default: the rows of the settings, the periodic check, the notes and the debug keys.
+# foobar2000 stores a cfg_var under the GUID in uppercase; the last run time (A3C8E6D1-...) is set by the scenarios.
+KNOWN_CFG_NAMES="'cfg_var.E1A6C4B9-3F7D-4E2A-9C8B-5D1F6A4E7C90','cfg_var.F2B7D5C0-4A8E-4F3B-AD9C-6E2A7B5F8D01','cfg_var.F7C3A9E2-6D1B-4F8A-9C2E-3B5D7A1F9C60','cfg_var.5876B420-1282-464E-9CB9-7CF32156F4F5','cfg_var.03396D36-9ED8-4F2E-9DC8-B1A16C75EE5D','cfg_var.141C795E-24E0-45FE-ABC2-15AA49E4766B','cfg_var.FD5423CC-F021-4C2B-A7E9-B0A211B85D27'"
+sqlite3 "$CONFIG_DB" "DELETE FROM configInts WHERE name IN ($KNOWN_CFG_NAMES); DELETE FROM configStrings WHERE name IN ($KNOWN_CFG_NAMES) OR name GLOB 'foo_component_updater_mac.debug.*';" \
+    || { fail "known profile: could not reset the settings rows"; exit 1; }
+say "PASS settings reset: our cfg_var rows and foo_component_updater_mac.debug.* keys deleted (all defaults)"
 
 section "Build and install the Debug component"
 if "$PROJECT_DIR/Scripts/build.sh" --debug --install > "$WORK/build.log" 2>&1; then
