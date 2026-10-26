@@ -2,7 +2,7 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-10-26
 
 ### Added
 
@@ -14,6 +14,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Changed
 
 * The Source column is gone; hover over the latest version to see where it was found.
+
+### Install
+
+Version 0.2.0 or later: tick this component in the results window, click Install and restart foobar2000. Version 0.1.0: open foobar2000 > Settings... > Components, click **+**, choose `foo_component_updater_mac.fb2k-component` and restart foobar2000.
 
 ## [0.2.2] - 2026-10-23
 
