@@ -358,7 +358,10 @@ void RunChecks(
                 rs.origin = rl.origin == fcu::ReplacementOrigin::InfoPlist ? fcu::SourceOrigin::InfoPlist : fcu::SourceOrigin::BuiltIn;
                 rs.entry = rl.replacement.source;
             } else {
-                rs = fcu::resolveSource(r.replacedBy, {}, lists);
+                // Not through the shared registry: it is third party and could point a trusted declaration at other code.
+                fcu::SourceLists trusted;
+                trusted.builtIn = lists.builtIn;
+                rs = fcu::resolveSource(r.replacedBy, {}, trusted);
             }
             r.sourceOrigin = fcu::originLabel(rs.origin);
             r.sourceLabel = SourceLabel(rs.entry);

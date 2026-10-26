@@ -57,6 +57,11 @@ NSString *statusText(UpdateStatus s) {
     return @"";
 }
 
+// The successor of a Replaced row is installed, or staged by an earlier switch or by foobar2000: switching only removes.
+bool successorPresent(CheckResult const& r) {
+    return r.replacementInstalled || fcu::isStaged(r.replacedBy);
+}
+
 }
 
 @interface FCUResultRow : NSObject
@@ -359,9 +364,8 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         bool marked = r->prerelease && r->latestVersion.find('-') == std::string::npos;
         row.latest = marked ? [NSString stringWithFormat:@"%@ (beta)", ns(r->latestVersion)] : ns(r->latestVersion);
         if (r->status == UpdateStatus::Replaced) {
-            // The release fields describe the replacement; its name leads, so the column reads "foo_new 2.0.1".
-            row.latest = r->replacementInstalled ? [NSString stringWithFormat:@"%@ (installed)", ns(r->replacedBy)]
-                : [NSString stringWithFormat:@"%@ %@", ns(r->replacedBy), row.latest];
+            // The release fields describe the successor; the wide Component column names it, Latest keeps its version.
+            row.component = [NSString stringWithFormat:@"%@ → %@%@", row.component, ns(r->replacedBy), r->replacementInstalled ? @" (installed)" : @""];
         }
         row.prerelease = r->prerelease;
         row.releaseNotes = ns(r->releaseNotes);
@@ -380,13 +384,13 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.name = ns(r->dllName);
         row.replacedBy = ns(r->replacedBy);
         row.replacementOrigin = ns(r->replacementOrigin);
-        row.replacementInstalled = r->replacementInstalled;
+        row.replacementInstalled = successorPresent(*r);
         row.kept = r->kept;
         row.staged = fcu::isStaged(r->dllName) || fcu::isRemovalStaged(r->dllName);
         bool const switching = r->status == UpdateStatus::Replaced;
-        // With the replacement installed, switching only removes this component: nothing to download.
-        row.blockReason = switching && r->replacementInstalled
-            ? (row.staged ? @"Restart foobar2000 to finish" : @"")
+        // With the successor installed or staged, switching only removes this component: nothing to download.
+        row.blockReason = switching && fcu::isRemovalStaged(r->replacedBy) ? [NSString stringWithFormat:@"%@ is being removed; restart foobar2000 first", ns(r->replacedBy)]
+            : switching && row.replacementInstalled ? (row.staged ? @"Restart foobar2000 to finish" : @"")
             : ns(fcu::installBlockReason(r->status == UpdateStatus::UpdateAvailable || switching, r->dllName, r->downloadUrl, r->assetName, row.staged));
         std::string backup;
         row.backupVersion = r->dllName != "Core" && fcu::backupVersion(r->dllName, backup) ? ns(backup) : @"";
@@ -451,8 +455,9 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
             jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl, ""});
             continue;
         }
-        jobs.push_back({r.dllName, r.installedVersion, r.replacementInstalled ? "" : r.downloadUrl, r.replacedBy});
-        NSString *what = r.replacementInstalled
+        bool const present = successorPresent(r);
+        jobs.push_back({r.dllName, r.installedVersion, present ? "" : r.downloadUrl, r.replacedBy});
+        NSString *what = present
             ? [NSString stringWithFormat:@"%@ %@ will be removed; %@ is already installed.", ns(r.dllName), ns(r.installedVersion), ns(r.replacedBy)]
             : [NSString stringWithFormat:@"%@ %@ will be removed and %@ %@ from %@ installed.", ns(r.dllName), ns(r.installedVersion),
                   ns(r.replacedBy), ns(r.latestVersion), ns(r.sourceLabel)];

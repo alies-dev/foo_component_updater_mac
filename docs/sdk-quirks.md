@@ -14,6 +14,7 @@ Facts measured while building this component, with foobar2000 2.26 and `SDK-2026
 * A third party component can stage an install or update in `user-components/pending/<name>/<name>.component`. An empty file `pending/<name>` is an uninstall marker.
 * It is applied at the next start, before components load: the old directory is deleted and the staged directory is renamed into place. Nothing is applied at shutdown, and installing does not restart foobar2000.
 * A kill at any point of the apply step is finished by the next start.
+* One start applies several entries: an uninstall marker `pending/<old>` and a staged `pending/<new>/<new>.component` for a component that was not installed before end with `user-components/<old>` gone, `<new>` loaded and `pending/` empty (the m2 switch run of `Scripts/test_batch.sh`). The bundle may keep an executable named differently from the folder; `componentversion::get_file_name()` then reports the folder name.
 * foobar2000 writes the binary without the execute bit and it still loads.
 
 ## Restart and install (used from 0.2.0)

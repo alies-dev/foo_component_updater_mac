@@ -439,15 +439,10 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             CheckResult const r = rowOf(*results);
             (*log)["row"] = describe(r);
             (*log)["row"]["block_reason"] = fcu::installBlockReason(true, r.dllName, r.downloadUrl, r.assetName, false);
-            fcu::InstallOutcome o = fcu::switchComponent("foo_abx", r.replacedBy, r.downloadUrl, abort);
-            (*log)["outcomes"]["switch"] = {{"ok", o.ok}, {"message", o.message}};
-            next = "switch-after";
-        }
-        fb2k::inMainThread([=] {
-            (*log)["after"] = stateOf(name);
-            if (switching) (*log)["replacement_after"] = stateOf("foo_abx_ng");
-            if (scenario == "switch") {
-                // The window with the replaced row, plus a row that shares its job with another installed component.
+            // The window before the switch, plus a row that shares its job with another installed component. The
+            // worker waits, so the snapshot shows the replaced row and not the staged one.
+            dispatch_semaphore_t rendered = dispatch_semaphore_create(0);
+            fb2k::inMainThread([=] {
                 std::vector<CheckResult> shown = *results;
                 CheckResult overlap;
                 overlap.dllName = "foo_lastfm";
@@ -457,7 +452,16 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
                 overlap.overlap = "Same job as foo_jl_scrobble (Last.fm scrobbler). Keep only one.";
                 shown.push_back(overlap);
                 (*log)["snapshot_rows"] = DebugSnapshotResultsWindow(shown, false, "/tmp/fcu-ui/results-switch.png");
-            }
+                dispatch_semaphore_signal(rendered);
+            });
+            dispatch_semaphore_wait(rendered, DISPATCH_TIME_FOREVER);
+            fcu::InstallOutcome o = fcu::switchComponent("foo_abx", r.replacedBy, r.downloadUrl, abort);
+            (*log)["outcomes"]["switch"] = {{"ok", o.ok}, {"message", o.message}};
+            next = "switch-after";
+        }
+        fb2k::inMainThread([=] {
+            (*log)["after"] = stateOf(name);
+            if (switching) (*log)["replacement_after"] = stateOf("foo_abx_ng");
             if (scenario == "refuse") {
                 bool withBackup = false, without = true;
                 std::string title = DebugRestoreMenuItem(*results, "foo_abx", &withBackup);

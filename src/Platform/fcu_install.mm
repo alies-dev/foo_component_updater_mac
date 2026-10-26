@@ -392,6 +392,8 @@ InstallOutcome switchComponent(std::string const& name, std::string const& repla
         makeDirectory(pending);
         NSString *newTarget = join(pending, ns(replacement)), *oldTarget = join(pending, ns(name));
         struct stat st;
+        // Switching to a component that goes at the next start would remove both.
+        require(!isRemovalStaged(replacement), "The replacement is waiting to be removed; restart foobar2000 first.");
         // Installed or already waiting in pending/: only the removal is left to stage.
         bool const stageNew = !isDirectory(bundleIn(userComponentsDir(), replacement)) && !isStaged(replacement);
         if (stageNew) {
@@ -422,12 +424,17 @@ InstallOutcome switchComponent(std::string const& name, std::string const& repla
             }
             throw std::runtime_error(why);
         };
-        if (stageNew && rename(job.stagedAs(replacement).stringByDeletingLastPathComponent.fileSystemRepresentation, newTarget.fileSystemRepresentation) != 0) {
+        NSString *stagedFolder = job.stagedAs(replacement).stringByDeletingLastPathComponent;
+        if (stageNew && rename(stagedFolder.fileSystemRepresentation, newTarget.fileSystemRepresentation) != 0) {
             putBack("Could not stage the replacement.");
         }
         if (rename(marker.fileSystemRepresentation, oldTarget.fileSystemRepresentation) != 0) {
-            if (stageNew) [fm() removeItemAtPath:newTarget error:nil];
-            putBack("Could not stage the removal.");
+            // The replacement leaves pending/ in one rename, so a restart never loads both.
+            std::string why = "Could not stage the removal.";
+            if (stageNew && rename(newTarget.fileSystemRepresentation, stagedFolder.fileSystemRepresentation) != 0) {
+                why += std::string(" The replacement could not be taken back; delete ") + newTarget.fileSystemRepresentation + " before restarting foobar2000.";
+            }
+            putBack(why);
         }
         if (hadPending) [fm() removeItemAtPath:aside error:nil];
     });

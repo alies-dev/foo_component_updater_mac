@@ -66,7 +66,7 @@ When your component is superseded (renamed, merged into another one, taken over 
 Rules:
 
 * `dll` is required: the successor's file name (letters, digits, `.`, `_`, `-`, `+`), not your own.
-* `source`, `owner`, `repo` and `url` are optional and follow the `FB2KUpdateSource` rules above. Without them the successor is looked up like any component (registry, built in list, catalog). No other keys are allowed.
+* `source`, `owner`, `repo` and `url` are optional and follow the `FB2KUpdateSource` rules above. Without them the successor is looked up in the updater's built in list and then the foobar2000.org catalog, never in the shared registry: a third party list must not decide which code your declaration installs. Declare the source to be sure. No other keys are allowed.
 * It is a separate key on purpose: `FB2KUpdateSource` accepts no other keys, and older versions of the updater would drop the whole update source.
 * Once a user has that release, the results window shows the row as "Replaced" with the successor's version. Ticking it and clicking Install downloads the successor (same package rules as above, a valid signature and a bundle identifier) and removes your component at the next start of foobar2000. Users can keep yours instead (right click > Keep).
 * Settings are not carried over; the successor has its own.
