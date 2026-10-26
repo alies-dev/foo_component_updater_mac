@@ -2,6 +2,8 @@
 
 foobar2000 for Mac checks only itself for updates; this component checks the components you added.
 
+[Component topic on hydrogenaudio](https://hydrogenaudio.org/index.php/topic,130098.0.html).
+
 <p align="center">
   <img src="docs/images/results-window.png" alt="The results window listing installed components with installed version, latest version, release date and status" width="720">
   <br>
