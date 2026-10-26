@@ -6,6 +6,7 @@
 
 #include "../fb2k_sdk.h"
 #include "../Core/mapping_validation.h"
+#include "../UI/DebugSnapshot.h"
 #include "../upstream/update_check.h"
 
 namespace {
@@ -41,18 +42,24 @@ void store(std::vector<MigrationNote> const& notes) {
 
 NSString *ns(std::string const& s) { return [NSString stringWithUTF8String:s.c_str()] ?: @""; }
 
+// The alert offered after the restart; nil when the URL has no host.
+NSAlert *noteAlert(MigrationNote const& note) {
+    NSURL *url = [NSURL URLWithString:ns(note.url)];
+    if (!url.host.length) return nil;
+    NSAlert *alert = [NSAlert new];
+    alert.messageText = [NSString stringWithFormat:@"%@ replaced %@", ns(note.to), ns(note.from)];
+    alert.informativeText = [NSString stringWithFormat:@"Its author wrote migration notes on %@: what to set up again after the switch.", url.host];
+    [alert addButtonWithTitle:@"Open Notes"];
+    [alert addButtonWithTitle:@"Close"];
+    return alert;
+}
+
 // One alert per note, one after the other; the page opens only on a click. A note is forgotten once shown.
 void offer(std::vector<MigrationNote> notes, size_t index) {
     if (index >= notes.size() || fb2k::mainAborter().is_aborting()) return;
     MigrationNote const& note = notes[index];
-    NSURL *url = [NSURL URLWithString:ns(note.url)];
-    if (url.host.length) {
-        NSAlert *alert = [NSAlert new];
-        alert.messageText = [NSString stringWithFormat:@"%@ replaced %@", ns(note.to), ns(note.from)];
-        alert.informativeText = [NSString stringWithFormat:@"Its author wrote migration notes on %@: what to set up again after the switch.", url.host];
-        [alert addButtonWithTitle:@"Open Notes"];
-        [alert addButtonWithTitle:@"Close"];
-        if ([alert runModal] == NSAlertFirstButtonReturn) [[NSWorkspace sharedWorkspace] openURL:url];
+    if (NSAlert *alert = noteAlert(note); alert && [alert runModal] == NSAlertFirstButtonReturn) {
+        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:ns(note.url)]];
     }
     ForgetMigrationNote(note);
     offer(std::move(notes), index + 1);
@@ -105,3 +112,13 @@ void ForgetMigrationNote(MigrationNote const& note) {
     notes.erase(std::remove_if(notes.begin(), notes.end(), [&](MigrationNote const& n) { return lineOf(n) == lineOf(note); }), notes.end());
     store(notes);
 }
+
+#ifdef FCU_DEBUG_HOOKS
+std::string DebugSnapshotMigrationAlert(MigrationNote const& note, const char* pngPath) {
+    NSAlert *alert = noteAlert(note);
+    if (!alert) return "";
+    [alert layout];
+    DebugWriteSnapshot(alert.window.contentView, NSAppearanceNameAqua, [NSString stringWithUTF8String:pngPath]);
+    return std::string(alert.messageText.UTF8String) + "\n" + alert.informativeText.UTF8String;
+}
+#endif

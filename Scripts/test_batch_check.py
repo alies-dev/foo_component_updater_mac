@@ -173,6 +173,11 @@ def m2(run, log, previous_pid):
         check("the switch staged foo_abx_ng and the removal of foo_abx",
               o["switch"]["ok"] is True and after["removal_staged"] is True and log["replacement_after"]["staged"] is True, log)
         check("the results window rendered the switch rows", log["snapshot_rows"] > 0, log["snapshot_rows"])
+        expected = ("Switch foo_abx to foo_abx_ng?\nfoo_abx 2.2.3 will be removed.\nfoo_abx_ng 1.0.0 will be installed.\nFrom: fcu-test/foo_abx_ng\n"
+                    "Declared by foo_abx itself.\n\nSettings are not carried over. The changes apply when foobar2000 restarts.\n"
+                    "[link] Migration notes for foo_abx_ng (github.com) -> https://github.com/fcu-test/foo_abx_ng#migrating")
+        check("the switch confirmation names what goes, what comes, from where, who declared it, and links the notes",
+              log["switch_confirmation"] == expected, log["switch_confirmation"])
     elif run == "m2-switch-after":
         ng = log["replacement_before"]
         check("after the restart foo_abx is gone and foo_abx_ng 2.2.3 runs, nothing pending",
@@ -180,6 +185,9 @@ def m2(run, log, previous_pid):
         check("the migration notes of the applied switch are kept until offered, then gone",
               log["migration_notes"] == [{"from": "foo_abx", "to": "foo_abx_ng", "url": "https://github.com/fcu-test/foo_abx_ng#migrating"}]
               and log["migration_notes_kept_until_offered"] == 1 and log["migration_notes_again"] == 0, log)
+        check("the alert after the restart names both components and the notes' host",
+              log["migration_alert"] == "foo_abx_ng replaced foo_abx\nIts author wrote migration notes on github.com: what to set up again after the switch.",
+              log["migration_alert"])
     sys.exit(1 if failures else 0)
 
 

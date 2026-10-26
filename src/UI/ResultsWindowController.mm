@@ -461,23 +461,38 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
 
 - (void)installChecked:(id)sender {
     std::vector<Operation> jobs;
+    for (CheckResult const &r : _results) {
+        if (![_checked containsObject:ns(r.dllName)]) continue;
+        if (r.status != UpdateStatus::Replaced) {
+            jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl, "", "", ""});
+        } else {
+            jobs.push_back({r.dllName, r.installedVersion, successorPresent(r) ? "" : r.downloadUrl, r.replacedBy, r.replacementTeam, r.migration});
+        }
+    }
+    // A switch removes a component, so it is confirmed; plain updates are not.
+    NSAlert *alert = [self switchConfirmation];
+    if (alert && keepsWindowState()) {
+        NSModalResponse answer = [alert runModal];
+        _migrationLinks = nil;
+        if (answer != NSAlertFirstButtonReturn) return;
+    }
+    [self runOperations:jobs];
+}
+
+// The confirmation for the ticked Replaced rows, nil when there are none. Its migration links stay valid until
+// _migrationLinks is cleared.
+- (NSAlert *)switchConfirmation {
     NSMutableArray<NSString *> *switches = [NSMutableArray array];
     NSMutableArray<NSURL *> *notes = [NSMutableArray array];
     NSMutableArray<NSString *> *noteTitles = [NSMutableArray array];
     CheckResult const *only = nullptr;
     for (CheckResult const &r : _results) {
-        if (![_checked containsObject:ns(r.dllName)]) continue;
-        if (r.status != UpdateStatus::Replaced) {
-            jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl, "", "", ""});
-            continue;
-        }
+        if (![_checked containsObject:ns(r.dllName)] || r.status != UpdateStatus::Replaced) continue;
         only = &r;
-        bool const present = successorPresent(r);
-        jobs.push_back({r.dllName, r.installedVersion, present ? "" : r.downloadUrl, r.replacedBy, r.replacementTeam, r.migration});
         // One fact per line, the source on its own: a remote version string cannot run into it.
         NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObject:
             [NSString stringWithFormat:@"%@ %@ will be removed.", ns(r.dllName), plain(r.installedVersion)]];
-        if (present) {
+        if (successorPresent(r)) {
             [lines addObject:[NSString stringWithFormat:@"%@ is already installed.", ns(r.replacedBy)]];
         } else {
             [lines addObject:[NSString stringWithFormat:@"%@ %@ will be installed.", ns(r.replacedBy), plain(r.latestVersion)]];
@@ -492,39 +507,35 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
             [noteTitles addObject:[NSString stringWithFormat:@"Migration notes for %@ (%@)", ns(r.replacedBy), note.host]];
         }
     }
-    // A switch removes a component, so it is confirmed; plain updates are not.
-    if (switches.count && keepsWindowState()) {
-        NSAlert *alert = [NSAlert new];
-        alert.messageText = switches.count == 1 ? [NSString stringWithFormat:@"Switch %@ to %@?", ns(only->dllName), ns(only->replacedBy)]
-            : [NSString stringWithFormat:@"Switch %lu components?", (unsigned long)switches.count];
-        alert.informativeText = [[switches componentsJoinedByString:@"\n\n"]
-            stringByAppendingString:@"\n\nSettings are not carried over. The changes apply when foobar2000 restarts."];
-        // Links read before deciding; each opens in the browser only when clicked.
-        _migrationLinks = notes;
-        if (notes.count) {
-            NSStackView *stack = [NSStackView stackViewWithViews:@[]];
-            stack.orientation = NSUserInterfaceLayoutOrientationVertical;
-            stack.alignment = NSLayoutAttributeLeading;
-            for (NSUInteger i = 0; i < notes.count; ++i) {
-                NSButton *link = [NSButton buttonWithTitle:noteTitles[i] target:self action:@selector(openMigrationLink:)];
-                link.bordered = NO;
-                link.tag = (NSInteger)i;
-                link.toolTip = notes[i].absoluteString;
-                link.attributedTitle = [[NSAttributedString alloc] initWithString:noteTitles[i] attributes:@{
-                    NSForegroundColorAttributeName: NSColor.linkColor, NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)}];
-                [stack addArrangedSubview:link];
-            }
-            [stack layoutSubtreeIfNeeded];
-            stack.frame = NSMakeRect(0, 0, 300, stack.fittingSize.height);
-            alert.accessoryView = stack;
+    if (!only) return nil;
+
+    NSAlert *alert = [NSAlert new];
+    alert.messageText = switches.count == 1 ? [NSString stringWithFormat:@"Switch %@ to %@?", ns(only->dllName), ns(only->replacedBy)]
+        : [NSString stringWithFormat:@"Switch %lu components?", (unsigned long)switches.count];
+    alert.informativeText = [[switches componentsJoinedByString:@"\n\n"]
+        stringByAppendingString:@"\n\nSettings are not carried over. The changes apply when foobar2000 restarts."];
+    // Links read before deciding; each opens in the browser only when clicked.
+    _migrationLinks = notes;
+    if (notes.count) {
+        NSStackView *stack = [NSStackView stackViewWithViews:@[]];
+        stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+        stack.alignment = NSLayoutAttributeLeading;
+        for (NSUInteger i = 0; i < notes.count; ++i) {
+            NSButton *link = [NSButton buttonWithTitle:noteTitles[i] target:self action:@selector(openMigrationLink:)];
+            link.bordered = NO;
+            link.tag = (NSInteger)i;
+            link.toolTip = notes[i].absoluteString;
+            link.attributedTitle = [[NSAttributedString alloc] initWithString:noteTitles[i] attributes:@{
+                NSForegroundColorAttributeName: NSColor.linkColor, NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)}];
+            [stack addArrangedSubview:link];
         }
-        [alert addButtonWithTitle:@"Switch"];
-        [alert addButtonWithTitle:@"Cancel"];
-        NSModalResponse answer = [alert runModal];
-        _migrationLinks = nil;
-        if (answer != NSAlertFirstButtonReturn) return;
+        [stack layoutSubtreeIfNeeded];
+        stack.frame = NSMakeRect(0, 0, 300, stack.fittingSize.height);
+        alert.accessoryView = stack;
     }
-    [self runOperations:jobs];
+    [alert addButtonWithTitle:@"Switch"];
+    [alert addButtonWithTitle:@"Cancel"];
+    return alert;
 }
 
 - (void)openMigrationLink:(NSButton *)sender {
@@ -821,6 +832,21 @@ long DebugSnapshotResultsWindow(std::vector<CheckResult> const& results, bool sh
     SetShowBuiltInComponents(saved);
     g_lastLayout = [controller debugLayout].UTF8String;
     return ok ? (long)[controller visibleRowCount] : -1;
+}
+
+std::string DebugSnapshotSwitchConfirmation(std::vector<CheckResult> const& results, const char* pngPath) {
+    FCUResultsWindowController *controller = [[FCUResultsWindowController alloc] initWithEmptyMessage:@""];
+    [controller showResults:results];
+    [controller debugCheckFirstInstallable];
+    NSAlert *alert = [controller switchConfirmation];
+    if (!alert) return "";
+    [alert layout];
+    DebugWriteSnapshot(alert.window.contentView, NSAppearanceNameAqua, [NSString stringWithUTF8String:pngPath]);
+    NSMutableString *text = [NSMutableString stringWithFormat:@"%@\n%@", alert.messageText, alert.informativeText];
+    for (NSView *v in alert.accessoryView.subviews) {
+        if ([v isKindOfClass:NSButton.class]) [text appendFormat:@"\n[link] %@ -> %@", ((NSButton *)v).title, v.toolTip];
+    }
+    return text.UTF8String;
 }
 #endif
 

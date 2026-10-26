@@ -49,4 +49,8 @@ size_t DebugRealiseResultsWindow(std::vector<CheckResult> const& results, size_t
 // Renders the window content off screen in light mode, with built in components shown or hidden,
 // and writes a PNG. Returns the number of visible rows (-1 when the file could not be written).
 long DebugSnapshotResultsWindow(std::vector<CheckResult> const& results, bool showBuiltIn, const char* pngPath);
+
+// Ticks the first installable row and renders the switch confirmation it would ask for (PNG); returns its title, text
+// and links ("" when that row is no switch).
+std::string DebugSnapshotSwitchConfirmation(std::vector<CheckResult> const& results, const char* pngPath);
 #endif

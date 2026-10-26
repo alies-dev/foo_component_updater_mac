@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "../version.h"
+
 // The migration notes page a successor declares (FB2KReplacedBy "migration_url"), offered once after the switch.
 struct MigrationNote {
     std::string from, to; // file names: the removed component and its successor
@@ -18,3 +20,8 @@ std::vector<MigrationNote> AppliedMigrationNotes();
 
 // Once the note was offered; a quit before that keeps it for the next start.
 void ForgetMigrationNote(MigrationNote const& note);
+
+#ifdef FCU_DEBUG_HOOKS
+// Renders the alert offered after the restart (PNG); returns its title and text, "" when there is none.
+std::string DebugSnapshotMigrationAlert(MigrationNote const& note, const char* pngPath);
+#endif

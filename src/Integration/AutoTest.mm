@@ -457,6 +457,7 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
                 overlap.overlap = "Same job as foo_jl_scrobble (Last.fm scrobbler). Keep only one.";
                 shown.push_back(overlap);
                 (*log)["snapshot_rows"] = DebugSnapshotResultsWindow(shown, false, "/tmp/fcu-ui/results-switch.png");
+                (*log)["switch_confirmation"] = DebugSnapshotSwitchConfirmation(*results, "/tmp/fcu-ui/switch-confirmation.png");
                 dispatch_semaphore_signal(rendered);
             });
             dispatch_semaphore_wait(rendered, DISPATCH_TIME_FOREVER);
@@ -475,6 +476,7 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
                 std::vector<MigrationNote> const applied = AppliedMigrationNotes();
                 for (auto const& n : applied) notes.push_back({{"from", n.from}, {"to", n.to}, {"url", n.url}});
                 (*log)["migration_notes"] = notes;
+                (*log)["migration_alert"] = applied.empty() ? "" : DebugSnapshotMigrationAlert(applied[0], "/tmp/fcu-ui/migration-alert.png");
                 (*log)["migration_notes_kept_until_offered"] = AppliedMigrationNotes().size();
                 for (auto const& n : applied) ForgetMigrationNote(n);
                 (*log)["migration_notes_again"] = AppliedMigrationNotes().size();
