@@ -6,18 +6,16 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Added
 
-* "Replaced" status: when a component declares its successor (`FB2KReplacedBy` in its `Info.plist`, or the built in list), tick the row and click Install to switch: the successor is installed and the old component removed at the next start. A migration notes link the author provides is shown before the switch and offered once after it. Right click > Keep keeps the old one.
-* "Replaced" also covers components that foobar2000 itself now includes: a component can declare the foobar2000 version with `foobar2000` in `FB2KReplacedBy` (or `"replaced_by"` in the built in list). From that version, tick the row and click Install to remove the component at the next start; nothing is downloaded. Older versions show a note instead.
-* A warning when two installed components do the same job, for now the Last.fm scrobblers (foo_jl_scrobble, foo_mac_scrobble, foo_lastfm, foo_scrobbler_mac).
+* "Replaced" status: switch to a component's declared successor, or remove one that foobar2000 now includes, in one click.
+* A warning when two installed components do the same job, such as two Last.fm scrobblers.
 
 ### Changed
 
-* Preferences explain "Include prereleases" under the checkbox.
-* The update list moved from its own window into Preferences > Tools > Component Updates, with the same columns as foobar2000's Components page: Name, Version, Module and Status. The installed components are listed as soon as the page opens; Status fills in after a check. Latest, Released and Notes are gone: the version, date and notes are in the Status tooltip, and a double click opens the release page. The page is headed "Third-Party Component Updates" and says that foobar2000 and its built in components are updated with foobar2000 itself; the Help command is now **Check for Third-Party Component Updates...** and the built in components checkbox reads "Show built in components (updated with foobar2000)".
+* The update list moved into Preferences > Tools > Component Updates and looks like foobar2000's Components page.
 
 ### Removed
 
-* Custom sources in Preferences. Sources saved there are no longer used; components are found through their `FB2KUpdateSource` key, the shared registry, the built in list or the foobar2000.org catalog.
+* Custom sources in Preferences.
 
 ## [0.3.1] - 2026-10-26
 
