@@ -4,6 +4,7 @@
 #include <climits>
 #include <ctime>
 #include <fts.h>
+#include <functional>
 #include <spawn.h>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -374,6 +375,33 @@ void extractPackage(Job const& job, std::string const& name, std::string const& 
     require(rename(source.fileSystemRepresentation, job.stagedAs(name).fileSystemRepresentation) == 0, "Could not prepare the new version.");
 }
 
+// pending/<name> becomes an uninstall marker: an empty file, written in the work folder and renamed, like a staged folder.
+// A staged update of the component moves aside, so a failure can put it back. `takeBack` undoes what the caller staged
+// before and returns text for the user when that fails too.
+void stageMarker(Job const& job, NSString *pending, std::function<std::string()> const& takeBack = {}) {
+    NSString *oldTarget = join(pending, ns(job.name)), *marker = join(job.work, @"removal-marker");
+    NSString *aside = join(rootDir(), ns("previous-pending-" + job.name));
+    bool movedAside = false;
+    auto fail = [&](std::string why) {
+        if (takeBack) why += takeBack();
+        if (movedAside && rename(aside.fileSystemRepresentation, oldTarget.fileSystemRepresentation) != 0) {
+            why += std::string(" The previous pending entry could not be put back and was left at ") + aside.fileSystemRepresentation + ".";
+        }
+        throw std::runtime_error(why);
+    };
+    if (![[NSData data] writeToFile:marker atomically:NO]) fail("Could not stage the removal.");
+    struct stat st;
+    if (lstat(oldTarget.fileSystemRepresentation, &st) == 0) {
+        if (lstat(aside.fileSystemRepresentation, &st) == 0) {
+            fail(std::string("An earlier pending entry was left at ") + aside.fileSystemRepresentation + "; move it away first.");
+        }
+        if (rename(oldTarget.fileSystemRepresentation, aside.fileSystemRepresentation) != 0) fail("Could not stage the removal.");
+        movedAside = true;
+    }
+    if (rename(marker.fileSystemRepresentation, oldTarget.fileSystemRepresentation) != 0) fail("Could not stage the removal.");
+    if (movedAside) [fm() removeItemAtPath:aside error:nil];
+}
+
 } // namespace
 
 InstallOutcome installUpdate(std::string const& name, std::string const& installedVersion, std::string const& url, abort_callback& abort) {
@@ -391,7 +419,7 @@ InstallOutcome switchComponent(std::string const& name, std::string const& repla
         Job job(name);
         NSString *pending = join(userComponentsDir(), @"pending");
         makeDirectory(pending);
-        NSString *newTarget = join(pending, ns(replacement)), *oldTarget = join(pending, ns(name));
+        NSString *newTarget = join(pending, ns(replacement));
         struct stat st;
         // Switching to a component that goes at the next start would remove both.
         require(!isRemovalStaged(replacement), "The replacement is waiting to be removed; restart foobar2000 first.");
@@ -415,37 +443,23 @@ InstallOutcome switchComponent(std::string const& name, std::string const& repla
             require(bundleId(job.stagedAs(replacement)).length != 0, "The replacement has no bundle identifier.");
         }
 
-        // The removal marker is an empty file; written in the work folder and renamed, like the staged folder.
-        NSString *marker = join(job.work, @"removal-marker");
-        require([[NSData data] writeToFile:marker atomically:NO], "Could not stage the removal.");
-        // A staged update of the component being removed moves aside, so a failure below can put it back.
-        NSString *aside = join(rootDir(), ns("previous-pending-" + name));
-        bool const hadPending = lstat(oldTarget.fileSystemRepresentation, &st) == 0;
-        if (hadPending) {
-            if (lstat(aside.fileSystemRepresentation, &st) == 0) {
-                throw std::runtime_error(std::string("An earlier pending entry was left at ") + aside.fileSystemRepresentation + "; move it away first.");
-            }
-            require(rename(oldTarget.fileSystemRepresentation, aside.fileSystemRepresentation) == 0, "Could not stage the removal.");
-        }
-        auto putBack = [&](std::string const& why) {
-            if (hadPending && rename(aside.fileSystemRepresentation, oldTarget.fileSystemRepresentation) != 0) {
-                throw std::runtime_error(why + " The previous pending entry could not be put back and was left at " + aside.fileSystemRepresentation + ".");
-            }
-            throw std::runtime_error(why);
-        };
+        // A failing marker step takes the staged replacement back, so a restart never loads it without the removal.
         NSString *stagedFolder = job.stagedAs(replacement).stringByDeletingLastPathComponent;
-        if (stageNew && rename(stagedFolder.fileSystemRepresentation, newTarget.fileSystemRepresentation) != 0) {
-            putBack("Could not stage the replacement.");
-        }
-        if (rename(marker.fileSystemRepresentation, oldTarget.fileSystemRepresentation) != 0) {
-            // The replacement leaves pending/ in one rename, so a restart never loads both.
-            std::string why = "Could not stage the removal.";
-            if (stageNew && rename(newTarget.fileSystemRepresentation, stagedFolder.fileSystemRepresentation) != 0) {
-                why += std::string(" The replacement could not be taken back; delete ") + newTarget.fileSystemRepresentation + " before restarting foobar2000.";
-            }
-            putBack(why);
-        }
-        if (hadPending) [fm() removeItemAtPath:aside error:nil];
+        if (stageNew) require(rename(stagedFolder.fileSystemRepresentation, newTarget.fileSystemRepresentation) == 0, "Could not stage the replacement.");
+        stageMarker(job, pending, [&]() -> std::string {
+            if (!stageNew || rename(newTarget.fileSystemRepresentation, stagedFolder.fileSystemRepresentation) == 0) return "";
+            return std::string(" The replacement could not be taken back; delete ") + newTarget.fileSystemRepresentation + " before restarting foobar2000.";
+        });
+    });
+}
+
+InstallOutcome stageRemoval(std::string const& name, abort_callback& abort) {
+    return guarded([&] {
+        abort.check();
+        Job job(name);
+        NSString *pending = join(userComponentsDir(), @"pending");
+        makeDirectory(pending);
+        stageMarker(job, pending);
     });
 }
 

@@ -372,7 +372,8 @@ json stateOf(std::string const& name, std::string* version = nullptr) {
 // The install scenarios of `test_batch.sh m2`, one foobar2000 run each (config key foo_component_updater_mac.debug.m2).
 // Packages come from the stub (/pkg/<name>). install, restore, self-install and self-restore end in main_restart(): they set
 // the scenario of the next run and its log path (this one with the scenario name swapped) before restarting. The self-*
-// scenarios work on this component itself, the others on foo_abx; switch replaces foo_abx with foo_abx_ng.
+// scenarios work on this component itself, the others on foo_abx; switch replaces foo_abx with foo_abx_ng, core removes it
+// because foobar2000 itself includes it.
 void runInstallScenario(std::string const& path, std::string const& scenario) {
     auto log = std::make_shared<json>();
     auto version = std::make_shared<std::string>();
@@ -392,6 +393,17 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             (*log)["outcomes"][what] = {{"ok", o.ok}, {"message", o.message}};
         };
         auto pkg = [](char const* name) { return fcu::endpoint("", std::string("/pkg/") + name); };
+        auto rowOf = [](std::vector<CheckResult> const& all) {
+            for (auto const& r : all) {
+                if (r.dllName == "foo_abx") return r;
+            }
+            return CheckResult{};
+        };
+        auto describe = [](CheckResult const& r) {
+            return json{{"status", statusName(r.status)}, {"replaced_by", r.replacedBy}, {"origin", r.replacementOrigin}, {"kept", r.kept},
+                        {"replaced_by_foobar2000", r.replacedByFoobar2000}, {"latest", r.latestVersion}, {"source", r.sourceLabel},
+                        {"asset", r.assetName}, {"note", r.note}, {"migration", r.migration}};
+        };
         std::string next;
         if (scenario == "install") {
             for (auto const& r : RunUpdateCheck(installed, abort)) {
@@ -425,17 +437,6 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             (*log)["outcomes"]["switch_other_developer"] = {{"ok", o.ok}, {"message", o.message}};
             attempt("same_developer", pkg("devid"));
         } else if (scenario == "switch") {
-            auto rowOf = [&](std::vector<CheckResult> const& all) {
-                for (auto const& r : all) {
-                    if (r.dllName == "foo_abx") return r;
-                }
-                return CheckResult{};
-            };
-            auto describe = [](CheckResult const& r) {
-                return json{{"status", statusName(r.status)}, {"replaced_by", r.replacedBy}, {"origin", r.replacementOrigin}, {"kept", r.kept},
-                            {"latest", r.latestVersion}, {"source", r.sourceLabel}, {"asset", r.assetName}, {"note", r.note},
-                            {"migration", r.migration}};
-            };
             // Kept: the row is checked as usual (the catalog has foo_abx 2.2.3) and says what it keeps.
             SetReplacementKept("foo_abx", "foo_abx_ng", true);
             (*log)["kept_row"] = describe(rowOf(RunUpdateCheck(installed, abort)));
@@ -466,11 +467,34 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             // As the results window does once the switch is staged.
             if (o.ok && !r.migration.empty()) RememberMigrationNote({"foo_abx", r.replacedBy, r.migration});
             next = "switch-after";
+        } else if (scenario == "core") {
+            *results = RunUpdateCheck(installed, abort);
+            CheckResult const r = rowOf(*results);
+            (*log)["row"] = describe(r);
+            // A foobar2000 older than the declared version does not replace it yet: the row is checked as usual.
+            auto older = installed;
+            for (auto& c : older) {
+                if (c.fileName != "foo_abx") continue;
+                c.hasReplacedBy = true;
+                c.replacedByJson = "{\"foobar2000\":\"99\"}";
+            }
+            (*log)["older_row"] = describe(rowOf(RunUpdateCheck(older, abort)));
+            dispatch_semaphore_t rendered = dispatch_semaphore_create(0);
+            fb2k::inMainThread([=] {
+                (*log)["core_confirmation"] = DebugSnapshotSwitchConfirmation(*results, "/tmp/fcu-ui/core-confirmation.png");
+                dispatch_semaphore_signal(rendered);
+            });
+            dispatch_semaphore_wait(rendered, DISPATCH_TIME_FOREVER);
+            fcu::InstallOutcome o = fcu::stageRemoval("foo_abx", abort);
+            (*log)["outcomes"]["stage_removal"] = {{"ok", o.ok}, {"message", o.message}};
+            // As the results window does once the removal is staged.
+            if (o.ok && !r.migration.empty()) RememberMigrationNote({"foo_abx", r.replacedBy, r.migration});
+            next = "core-after";
         }
         fb2k::inMainThread([=] {
             (*log)["after"] = stateOf(name);
             if (switching) (*log)["replacement_after"] = stateOf("foo_abx_ng");
-            if (scenario == "switch-after") {
+            if (scenario == "switch-after" || scenario == "core-after") {
                 // The note stays until it was offered (a quit before that keeps it), then it is gone.
                 json notes = json::array();
                 std::vector<MigrationNote> const applied = AppliedMigrationNotes();
@@ -507,6 +531,9 @@ public:
         pfc::string8 pathValue = fb2k::configStore::get()->getConfigString("foo_component_updater_mac.debug.autotest")->c_str();
         if (pathValue.length() == 0) return;
         std::string path = pathValue.c_str();
+        // The batch starts foobar2000 with `open -g`, but main_restart() relaunches it in front: step back so the
+        // person at the machine keeps working in their own app.
+        [NSApp hide:nil];
         pfc::string8 scenario = fb2k::configStore::get()->getConfigString("foo_component_updater_mac.debug.m2")->c_str();
         if (scenario.length() > 0) {
             runInstallScenario(path, scenario.c_str());

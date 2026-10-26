@@ -26,7 +26,7 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 
 * A results window with the installed and the latest version of each component, its status and a link to the release notes.
 * Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back. The updater's own row works the same way.
-* Shows "Replaced" when a component names its successor, and switches to it when you tick the row: the successor is installed and the old component removed at the next start. Migration notes the author links to are offered with one click, before the switch and once after it. Right click > Keep stays with the old one.
+* Shows "Replaced" when a component names its successor, and switches to it when you tick the row: the successor is installed and the old component removed at the next start. Migration notes the author links to are offered with one click, before the switch and once after it. Right click > Keep stays with the old one. When a component says foobar2000 itself now includes its feature and you run that version, the row is "Replaced" too and Install only removes the component.
 * Warns when two installed components do the same job (Last.fm scrobblers so far): each would do the work twice.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
 * Checks automatically every few days.
