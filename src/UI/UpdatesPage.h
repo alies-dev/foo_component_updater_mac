@@ -57,6 +57,9 @@ std::string DebugLastUpdatesLayout();
 // Builds the page off screen with these results and creates every table cell, so the autotest exercises the
 // table code without showing any UI. Returns the cell count (5 per visible row).
 size_t DebugRealiseUpdatesTable(std::vector<CheckResult> const& results, size_t* visibleRows);
+// Builds the page off screen on an empty model (no check delivered yet) with built in components shown or hidden and
+// returns how many rows it lists: the installed components, from local data.
+long DebugUpdatesPageRowsBeforeCheck(bool showBuiltIn);
 
 // Renders the whole preferences page (settings and table) off screen at 720 x 560 in light mode, with built in
 // components shown or hidden, ticks the first installable row and writes a PNG. Returns the number of visible rows

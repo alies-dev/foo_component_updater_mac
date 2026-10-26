@@ -40,6 +40,7 @@ const char* statusName(UpdateStatus s) {
     case UpdateStatus::Error: return "error";
     case UpdateStatus::NoSource: return "no_source";
     case UpdateStatus::Replaced: return "replaced";
+    case UpdateStatus::Unchecked: return "unchecked";
     }
     return "";
 }
@@ -604,6 +605,8 @@ public:
                 (*log)["results_table"] = {{"rows", results.size()}, {"visible_rows", visible}, {"cells", cells},
                     {"visible_rows_shown", visibleShown}, {"cells_shown", cellsShown},
                     {"built_in_rows", std::count_if(results.begin(), results.end(), [](CheckResult const& r) { return r.dllName == "Core"; })}};
+                // Before any check delivered results the page lists the installed components itself.
+                (*log)["rows_before_check"] = {{"hidden", DebugUpdatesPageRowsBeforeCheck(false)}, {"shown", DebugUpdatesPageRowsBeforeCheck(true)}};
                 (*log)["snapshots"] = snapshots(results);
                 (*log)["apply"] = applyChecks();
                 (*log)["last_check_refresh"] = lastCheckRefreshChecks();

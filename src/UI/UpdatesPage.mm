@@ -58,6 +58,7 @@ int statusRank(UpdateStatus s) {
     case UpdateStatus::ComparisonUnsupported: return 3;
     case UpdateStatus::UpToDate: return 4;
     case UpdateStatus::NoSource: return 5;
+    case UpdateStatus::Unchecked: return 6;
     }
     return 6;
 }
@@ -76,6 +77,7 @@ NSString *statusText(CheckResult const& r) {
         return latest.length ? [NSString stringWithFormat:@"Unable to compare (%@)", latest] : @"Unable to compare";
     case UpdateStatus::Error: return @"Error";
     case UpdateStatus::NoSource: return @"No source";
+    case UpdateStatus::Unchecked: return @"";
     case UpdateStatus::Replaced:
         if (r.replacementInstalled && !r.replacedByFoobar2000) return [NSString stringWithFormat:@"Replaced by %@ (installed)", ns(r.replacedBy)];
         return [[NSString stringWithFormat:@"Replaced by %@ %@", ns(r.replacedBy), latest] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
@@ -146,6 +148,8 @@ bool confirmsModally() {
 - (void)finishCheckWithResults:(std::vector<CheckResult> const &)results emptyMessage:(NSString *)message;
 - (void)runCheck;
 - (void)setShowBuiltIn:(BOOL)show;
+- (void)refreshInstalled;
+- (void)prepareForDisplay;
 - (void)setChecked:(BOOL)checked forFile:(NSString *)file;
 - (void)resort;
 - (void)pageDidHide;
@@ -160,7 +164,8 @@ bool confirmsModally() {
 @end
 
 @implementation FCUUpdatesModel {
-    std::vector<CheckResult> _results;
+    std::vector<CheckResult> _results; // the check's results; before the first one, the installed components as UpdateStatus::Unchecked rows
+    BOOL _hasCheckResults;             // a check delivered results this session
     NSMutableDictionary<NSString *, NSString *> *_failures; // last install error per component
     NSString *_emptyMessage;
     NSArray<NSURL *> *_migrationLinks; // links of the open switch confirmation, by button tag
@@ -203,6 +208,7 @@ bool confirmsModally() {
 // never restarted. An install also holds the check slot, but the page already shows it.
 - (void)pageDidShow {
     _visible = YES;
+    [self refreshInstalled];
     if (_installing || !IsUpdateCheckRunning()) return;
     if (_checking && _checkId == CurrentUpdateCheckId()) return;
     [self attachToRunningCheck];
@@ -257,6 +263,7 @@ bool confirmsModally() {
 
 - (void)showResults:(std::vector<CheckResult> const &)results emptyMessage:(NSString *)message {
     _results = results;
+    _hasCheckResults = YES;
     _emptyMessage = [message copy];
     [_checked removeAllObjects];
     [_failures removeAllObjects];
@@ -324,7 +331,7 @@ bool confirmsModally() {
             : switching && row.replacementInstalled ? (row.staged ? @"Restart foobar2000 to finish" : @"")
             : ns(fcu::installBlockReason(r->status == UpdateStatus::UpdateAvailable || switching, r->dllName, r->downloadUrl, r->assetName, row.staged));
         std::string backup;
-        row.backupVersion = r->dllName != "Core" && fcu::backupVersion(r->dllName, backup) ? ns(backup) : @"";
+        row.backupVersion = r->dllName != "Core" && r->status != UpdateStatus::Unchecked && fcu::backupVersion(r->dllName, backup) ? ns(backup) : @"";
         if (row.staged) {
             row.status = @"Restart to finish";
         } else if (NSString *why = _failures[row.file]) {
@@ -349,7 +356,7 @@ bool confirmsModally() {
 
     // While a check or an install runs the status line shows its progress; toggling the checkbox only rebuilds the rows.
     if (!_checking && !_installing) {
-        if (_results.empty()) {
+        if (!_hasCheckResults || _results.empty()) {
             _status = _emptyMessage;
         } else if (rateLimit) {
             _status = rateLimit;
@@ -360,6 +367,29 @@ bool confirmsModally() {
         }
     }
     [[NSNotificationCenter defaultCenter] postNotificationName:kRowsChanged object:self];
+}
+
+// Before a check delivered results, the page lists the installed components from local data (no network):
+// name, version and module only; nothing to install. The page asks again each time it appears, as components may
+// have been added since.
+- (void)refreshInstalled {
+    if (_hasCheckResults) return;
+    _results.clear();
+    for (InstalledComponentInfo const &c : GetInstalledComponents()) {
+        CheckResult r;
+        r.dllName = c.fileName;
+        r.displayName = c.displayName;
+        r.installedVersion = c.installedVersion;
+        r.about = c.about;
+        r.status = UpdateStatus::Unchecked;
+        _results.push_back(std::move(r));
+    }
+    [self rebuildRows];
+}
+
+// A page that is created shows the installed components right away, not only once it has appeared.
+- (void)prepareForDisplay {
+    if (!_hasCheckResults && _results.empty()) [self refreshInstalled];
 }
 
 - (void)resort {
@@ -622,6 +652,7 @@ FCUUpdatesModel *scratchModel(std::vector<CheckResult> const& results) {
 - (instancetype)initWithFrame:(NSRect)frame {
     if ((self = [super initWithFrame:frame])) {
         _model = model();
+        [_model prepareForDisplay];
         [self buildContent];
         NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
         [center addObserver:self selector:@selector(rowsChanged:) name:kRowsChanged object:_model];
@@ -777,8 +808,8 @@ FCUUpdatesModel *scratchModel(std::vector<CheckResult> const& results) {
             box.identifier = ident;
         }
         BOOL installable = row.blockReason.length == 0 && !row.builtIn;
-        // Built in components are never installed: no checkbox (hidden, so the row still has its cell).
-        box.hidden = row.builtIn;
+        // Built in components are never installed, and nothing is before a check: no checkbox (hidden, so the row still has its cell).
+        box.hidden = row.builtIn || row.statusCode == UpdateStatus::Unchecked;
         box.enabled = installable;
         box.state = installable && [_model.checked containsObject:row.file] ? NSControlStateValueOn : NSControlStateValueOff;
         NSString *action = row.statusCode != UpdateStatus::Replaced ? @"Install this update"
@@ -925,6 +956,19 @@ size_t DebugRealiseUpdatesTable(std::vector<CheckResult> const& results, size_t*
     }
     if (visibleRows) *visibleRows = [view visibleRowCount];
     return [view realiseAllCells];
+}
+
+long DebugUpdatesPageRowsBeforeCheck(bool showBuiltIn) {
+    bool saved = GetShowBuiltInComponents();
+    SetShowBuiltInComponents(showBuiltIn);
+    FCUUpdatesView *view = nil;
+    {
+        ScopedModel scope([FCUUpdatesModel new]); // no results: the page lists the installed components itself
+        view = [[FCUUpdatesView alloc] initWithFrame:NSMakeRect(0, 0, 680, 400)];
+    }
+    [view realiseAllCells];
+    SetShowBuiltInComponents(saved);
+    return (long)[view visibleRowCount];
 }
 
 long DebugSnapshotUpdatesPage(std::vector<CheckResult> const& results, bool showBuiltIn, const char* pngPath) {

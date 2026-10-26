@@ -46,6 +46,10 @@ def common(log):
           and rw["cells"] == 5 * rw["visible_rows"], rw)
     check("updates table with built in components shown lists every row (measured separately from the saved preference)",
           rw["visible_rows_shown"] == rw["rows"] and rw["cells_shown"] == 5 * rw["rows"], rw)
+    rb = log["rows_before_check"]
+    check("before any check the page lists the installed components from local data (built in only when shown)",
+          rb["hidden"] == len([r for r in log["rows"] if r["component"] not in ("", "Core")])
+          and rb["shown"] == len([r for r in log["rows"] if r["component"]]), rb)
     iv = log["apply"]["interval"]
     check("interval field commits on end editing: 12 saved, 0 clamps to 1, 31 clamps to 30, empty and text revert, typed text survives a stepper click",
           iv["type_12"] == 12 and iv["type_0"] == 1 and iv["type_31"] == 30 and iv["type_12_again"] == 12

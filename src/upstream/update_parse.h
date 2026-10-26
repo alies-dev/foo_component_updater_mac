@@ -12,6 +12,7 @@ enum class UpdateStatus {
     Error,
     NoSource,
     Replaced, // another component took over (CheckResult::replacedBy); never from compareVersions
+    Unchecked, // the Component Updates page lists the installed component before any check; RunUpdateCheck never returns it
 };
 
 UpdateStatus compareVersions(std::string const& installedRaw, std::string const& latestRaw);
