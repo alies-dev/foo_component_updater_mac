@@ -15,6 +15,7 @@
 
 #include "../fb2k_sdk.h"
 #include "ComponentIds.h"
+#include "MigrationNotes.h"
 #include "Settings.h"
 #include "../Platform/fcu_http.h"
 #include "../UI/PreferencesController.h"
@@ -419,6 +420,9 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
         } else if (scenario == "team") {
             attempt("other_developer", pkg("good"));
             attempt("forged_team", pkg("forgedteam"));
+            // A Developer ID component that declares no Team ID for its successor hands over only to its own developer.
+            fcu::InstallOutcome o = fcu::switchComponent(name, "foo_abx_ng", pkg("foo_abx_ng"), "", abort);
+            (*log)["outcomes"]["switch_other_developer"] = {{"ok", o.ok}, {"message", o.message}};
             attempt("same_developer", pkg("devid"));
         } else if (scenario == "switch") {
             auto rowOf = [&](std::vector<CheckResult> const& all) {
@@ -429,7 +433,8 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             };
             auto describe = [](CheckResult const& r) {
                 return json{{"status", statusName(r.status)}, {"replaced_by", r.replacedBy}, {"origin", r.replacementOrigin}, {"kept", r.kept},
-                            {"latest", r.latestVersion}, {"source", r.sourceLabel}, {"asset", r.assetName}, {"note", r.note}};
+                            {"latest", r.latestVersion}, {"source", r.sourceLabel}, {"asset", r.assetName}, {"note", r.note},
+                            {"migration", r.migration}};
             };
             // Kept: the row is checked as usual (the catalog has foo_abx 2.2.3) and says what it keeps.
             SetReplacementKept("foo_abx", "foo_abx_ng", true);
@@ -455,13 +460,22 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
                 dispatch_semaphore_signal(rendered);
             });
             dispatch_semaphore_wait(rendered, DISPATCH_TIME_FOREVER);
-            fcu::InstallOutcome o = fcu::switchComponent("foo_abx", r.replacedBy, r.downloadUrl, abort);
+            fcu::InstallOutcome o = fcu::switchComponent("foo_abx", r.replacedBy, r.downloadUrl, r.replacementTeam, abort);
             (*log)["outcomes"]["switch"] = {{"ok", o.ok}, {"message", o.message}};
+            // As the results window does once the switch is staged.
+            if (o.ok && !r.migration.empty()) RememberMigrationNote({"foo_abx", r.replacedBy, r.migration});
             next = "switch-after";
         }
         fb2k::inMainThread([=] {
             (*log)["after"] = stateOf(name);
             if (switching) (*log)["replacement_after"] = stateOf("foo_abx_ng");
+            if (scenario == "switch-after") {
+                // Offered once: the second take finds nothing.
+                json notes = json::array();
+                for (auto const& n : TakeAppliedMigrationNotes()) notes.push_back({{"from", n.from}, {"to", n.to}, {"url", n.url}});
+                (*log)["migration_notes"] = notes;
+                (*log)["migration_notes_again"] = TakeAppliedMigrationNotes().size();
+            }
             if (scenario == "refuse") {
                 bool withBackup = false, without = true;
                 std::string title = DebugRestoreMenuItem(*results, "foo_abx", &withBackup);

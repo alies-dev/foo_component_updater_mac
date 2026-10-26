@@ -4,6 +4,7 @@
 #include <cctype>
 #include <set>
 
+#include "list_entry.h"
 #include "mapping_validation.h"
 #include "../upstream/third_party/nlohmann/json.hpp"
 
@@ -11,10 +12,21 @@ namespace fcu {
 
 namespace {
 
-// What foobar2000 accepts as user-components/<name>; nothing that could leave that folder.
+// What foobar2000 accepts as user-components/<name>; nothing that could leave that folder, and not the
+// folder foobar2000 stages into.
 bool isComponentName(std::string const& s) {
     if (s.empty() || s.size() > 128 || s[0] == '.') return false;
-    return std::all_of(s.begin(), s.end(), [](unsigned char c) { return std::isalnum(c) || c == '.' || c == '_' || c == '-' || c == '+'; });
+    std::string const n = normalizeComponentName(s);
+    if (n == "pending" || n == "core") return false;
+    return std::all_of(s.begin(), s.end(), [](char c) { return isAsciiAlnum(c) || c == '.' || c == '_' || c == '-' || c == '+'; });
+}
+
+// Shown to the user by host and opened in the browser on a click: printable ASCII only (no look-alike
+// host names), and no user name before the host ("https://github.com@evil.example/").
+bool isMigrationUrl(std::string const& url) {
+    if (!isHttpsUrl(url) || !std::all_of(url.begin(), url.end(), [](unsigned char c) { return c > 0x20 && c < 0x7f; })) return false;
+    std::string const authority = url.substr(8, url.find_first_of("/?#", 8) - 8);
+    return authority.find('@') == std::string::npos;
 }
 
 bool parseObject(nlohmann::json const& obj, Replacement& out, std::string& error) {
@@ -24,22 +36,40 @@ bool parseObject(nlohmann::json const& obj, Replacement& out, std::string& error
     }
     for (auto it = obj.begin(); it != obj.end(); ++it) {
         std::string const& k = it.key();
-        if (k != "dll" && k != "source" && k != "owner" && k != "repo" && k != "url") {
+        if (k != "component" && k != "migration" && k != "team" && k != "source" && k != "owner" && k != "repo" && k != "url") {
             error = "unknown field \"" + k + "\"";
             return false;
         }
     }
-    auto dll = obj.find("dll");
-    if (dll == obj.end() || !dll->is_string() || !isComponentName(dll->get<std::string>())) {
-        error = "\"dll\" must name the replacing component (letters, digits, '.', '_', '-', '+')";
+    auto component = obj.find("component");
+    if (component == obj.end() || !component->is_string() || !isComponentName(component->get<std::string>())) {
+        error = "\"component\" must name the successor (letters, digits, '.', '_', '-', '+')";
         return false;
     }
     Replacement r;
-    r.dllName = normalizeComponentName(dll->get<std::string>());
-    if (obj.size() > 1) {
-        nlohmann::json fields = obj;
-        fields.erase("dll");
-        if (!parseSourceDictionary(r.dllName, fields.dump(), r.source, error)) return false;
+    r.name = normalizeComponentName(component->get<std::string>());
+    nlohmann::json fields = obj;
+    fields.erase("component");
+    if (auto m = fields.find("migration"); m != fields.end()) {
+        if (!m->is_string() || !isMigrationUrl(m->get<std::string>())) {
+            error = "\"migration\" must be an https:// URL of printable ASCII without a user name";
+            return false;
+        }
+        r.migration = m->get<std::string>();
+        fields.erase("migration");
+    }
+    if (auto t = fields.find("team"); t != fields.end()) {
+        std::string const team = t->is_string() ? t->get<std::string>() : "";
+        bool const valid = team.size() == 10 && std::all_of(team.begin(), team.end(), [](char c) { return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'); });
+        if (!valid) {
+            error = "\"team\" must be a Team ID (10 capital letters or digits)";
+            return false;
+        }
+        r.team = team;
+        fields.erase("team");
+    }
+    if (!fields.empty()) {
+        if (!parseSourceDictionary(r.name, fields.dump(), r.source, error)) return false;
         r.hasSource = true;
     }
     out = std::move(r);
@@ -73,11 +103,11 @@ void parseBuiltInExtras(std::string const& text, std::map<std::string, Replaceme
     auto components = parsed.find("components");
     if (components != parsed.end() && components->is_array()) {
         for (auto const& item : *components) {
-            if (!item.is_object() || !item.contains("replaced_by") || !item.value("dll", nlohmann::json()).is_string()) continue;
-            std::string name = normalizeComponentName(item["dll"].get<std::string>());
+            if (!item.is_object() || !item.contains("replaced_by")) continue;
+            std::string name = normalizeComponentName(listEntryName(item));
             Replacement r;
             std::string error;
-            if (isComponentName(name) && parseObject(item["replaced_by"], r, error) && r.dllName != name) replacements.emplace(name, std::move(r));
+            if (isComponentName(name) && parseObject(item["replaced_by"], r, error) && r.name != name) replacements.emplace(name, std::move(r));
         }
     }
 
@@ -106,8 +136,8 @@ ReplacementLookup findReplacement(std::string const& fileName, bool plistPresent
         std::string error;
         if (!parseReplacedBy(plistJson, declared, error)) {
             r.note = error;
-        } else if (declared.dllName == name) {
-            r.note = "Invalid FB2KReplacedBy: \"dll\" names the component itself";
+        } else if (declared.name == name) {
+            r.note = "Invalid FB2KReplacedBy: \"component\" names the component itself";
         } else {
             r.origin = ReplacementOrigin::InfoPlist;
             r.replacement = std::move(declared);

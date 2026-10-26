@@ -22,9 +22,10 @@
 #   m2-refuse    the old version runs again, the backup holds the new one; nine bad packages are refused
 #   m2-bomb      two packages whose declared sizes pass but which hold 3000 MB (plain, and as an AppleDouble resource fork): ditto is killed, nothing is staged
 #   m2-self-*    the component installs its own update (9.9.9), restarts into it, restores its own backup and restarts again
-#   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged
+#   m2-team      a Developer ID bundle is installed: another developer's package is refused, the same Team ID is staged, and a
+#                switch to an ad hoc successor is refused (no declared Team ID: the old one's applies)
 #   m2-switch    foo_abx declares FB2KReplacedBy foo_abx_ng: a kept row is checked as usual, the switch stages foo_abx_ng and
-#                removes foo_abx; after the restart only foo_abx_ng is installed
+#                removes foo_abx; after the restart only foo_abx_ng is installed and its migration notes are offered once
 #
 # Rules (hard): ~/Library/foobar2000-v2 is backed up first and restored afterwards
 # (verified with diff -rq); foobar2000 is started only with `open -g -a foobar2000`,
@@ -550,8 +551,9 @@ run_m2() {
     # switch: the ad hoc foo_abx with an FB2KReplacedBy key, nothing pending (the team run staged foo_abx).
     rm -rf "$PROFILE/user-components/pending/foo_abx" "$PROFILE/user-components/foo_abx/foo_abx.component"
     cp -R "$WORK/good/mac/foo_abx.component" "$PROFILE/user-components/foo_abx/"
-    /usr/libexec/PlistBuddy -c "Add :FB2KReplacedBy dict" -c "Add :FB2KReplacedBy:dll string foo_abx_ng" -c "Add :FB2KReplacedBy:source string github" \
-        -c "Add :FB2KReplacedBy:owner string fcu-test" -c "Add :FB2KReplacedBy:repo string foo_abx_ng" "$installed/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :FB2KReplacedBy dict" -c "Add :FB2KReplacedBy:component string foo_abx_ng" -c "Add :FB2KReplacedBy:source string github" \
+        -c "Add :FB2KReplacedBy:owner string fcu-test" -c "Add :FB2KReplacedBy:repo string foo_abx_ng" \
+        -c "Add :FB2KReplacedBy:migration string https://github.com/fcu-test/foo_abx_ng#migrating" "$installed/Contents/Info.plist"
     codesign --force --sign - "$installed" >/dev/null 2>&1 || { fail "codesign foo_abx with FB2KReplacedBy"; exit 1; }
     mkdir -p /tmp/fcu-ui
     BATCH_PID=""

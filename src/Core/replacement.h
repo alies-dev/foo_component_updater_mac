@@ -10,13 +10,16 @@ namespace fcu {
 
 // The component that took over from an installed one.
 struct Replacement {
-    std::string dllName;          // normalized file name of the replacement
-    bool hasSource = false;       // where its updates live was declared with it
-    RepositoryMappingEntry source; // when hasSource; source.dllName == dllName
+    std::string name;              // normalized file name of the successor
+    bool hasSource = false;        // where its updates live was declared with it
+    RepositoryMappingEntry source; // when hasSource; source.dllName == name
+    std::string migration;         // https page with migration notes, "" when none
+    std::string team;              // Team ID the successor must be signed with, "" when not declared
 };
 
-// Strict parse of an FB2KReplacedBy dictionary (given as JSON): "dll" required, plus optional
-// source fields under the FB2KUpdateSource rules (all or nothing). Errors start "Invalid FB2KReplacedBy: ".
+// Strict parse of an FB2KReplacedBy dictionary (given as JSON): "component" required; optional
+// source fields under the FB2KUpdateSource rules (all or nothing), "migration" (https URL) and
+// "team" (10 character Team ID). Errors start "Invalid FB2KReplacedBy: ".
 bool parseReplacedBy(std::string const& json, Replacement& out, std::string& error);
 
 // Several components that do the same job; running two of them does it twice.

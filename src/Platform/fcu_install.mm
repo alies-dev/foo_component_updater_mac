@@ -221,22 +221,21 @@ NSString *bundleId(NSString *bundle) {
     return info[@"CFBundleIdentifier"] ?: @"";
 }
 
-// The candidate must be validly signed (ad hoc is fine) and, when `team` is set, chain to Apple with that Team ID.
-void verifySignature(NSString *candidate, NSString *team) {
+// The candidate must be validly signed (ad hoc is fine) and, when `team` is set, chain to Apple with that Team ID;
+// `mismatch` is the message when it does not.
+void verifySignature(NSString *candidate, NSString *team, std::string const& mismatch) {
     id code = staticCode(candidate);
     SecRequirementRef requirement = nullptr;
     if (team.length != 0) {
         // The Team ID field alone is not proof: an ad hoc signature can carry any string there. The requirement ties it to Apple's certificate chain.
-        require([team rangeOfString:@"^[A-Z0-9]{10}$" options:NSRegularExpressionSearch].location != NSNotFound, "The installed component has an unusual Team ID.");
+        require([team rangeOfString:@"^[A-Z0-9]{10}$" options:NSRegularExpressionSearch].location != NSNotFound, "The expected Team ID is unusual.");
         NSString *text = [NSString stringWithFormat:@"anchor apple generic and certificate leaf[subject.OU] = \"%@\"", team];
         require(SecRequirementCreateWithString((__bridge CFStringRef)text, kSecCSDefaultFlags, &requirement) == errSecSuccess, "Could not build the signature requirement.");
     }
     id holder = CFBridgingRelease(requirement);
     OSStatus status = SecStaticCodeCheckValidity((__bridge SecStaticCodeRef)code,
         kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode, (__bridge SecRequirementRef)holder);
-    if (status == errSecCSReqFailed) {
-        throw std::runtime_error(std::string("The new version is signed by a different developer than the installed one (Team ID ") + team.UTF8String + ").");
-    }
+    if (status == errSecCSReqFailed) throw std::runtime_error(mismatch);
     if (status != errSecSuccess) {
         NSString *why = CFBridgingRelease(SecCopyErrorMessageString(status, nullptr));
         throw std::runtime_error(std::string("The code signature of the new version is not valid (") + (why ? why.UTF8String : "unknown error") + ").");
@@ -245,7 +244,8 @@ void verifySignature(NSString *candidate, NSString *team) {
 
 // Same product as the installed bundle: same bundle identifier and, when the installed one has a Team ID, that Team ID.
 void verifyIdentity(NSString *candidate, NSString *installed) {
-    verifySignature(candidate, teamId(staticCode(installed)));
+    NSString *team = teamId(staticCode(installed));
+    verifySignature(candidate, team, std::string("The new version is signed by a different developer than the installed one (Team ID ") + team.UTF8String + ").");
     require([bundleId(candidate) isEqualToString:bundleId(installed)], "The new version has a different bundle identifier than the installed one.");
 }
 
@@ -384,7 +384,8 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
     });
 }
 
-InstallOutcome switchComponent(std::string const& name, std::string const& replacement, std::string const& url, abort_callback& abort) {
+InstallOutcome switchComponent(std::string const& name, std::string const& replacement, std::string const& url, std::string const& team,
+                                abort_callback& abort) {
     return guarded([&] {
         require(validName(replacement) && replacement != name, "Invalid replacement name.");
         Job job(name);
@@ -399,14 +400,20 @@ InstallOutcome switchComponent(std::string const& name, std::string const& repla
         bool const stageNew = !url.empty();
         if (stageNew) {
             require(lstat(newTarget.fileSystemRepresentation, &st) != 0, "foobar2000 has a pending change for the replacement; restart foobar2000 first.");
+            // On disk but not loaded (the check found no such component): staging would replace it without a backup.
+            require(lstat(join(userComponentsDir(), ns(replacement)).fileSystemRepresentation, &st) != 0,
+                    "A folder for the replacement exists but foobar2000 did not load it; remove it first.");
         } else {
             require(isDirectory(bundleIn(userComponentsDir(), replacement)) || isStaged(replacement), "The replacement offers no package to install.");
         }
         if (stageNew) {
             extractPackage(job, replacement, url, abort);
             sanitize(job.stagedAs(replacement));
-            // A different product: no identity to compare with, but the signature must hold and the bundle must say what it is.
-            verifySignature(job.stagedAs(replacement), @"");
+            // A different product, so no bundle identifier to compare. The developer is pinned: the declared Team ID, or else the
+            // old component's own when it has one, so a Developer ID component never hands over to code its developer did not sign.
+            NSString *expected = !team.empty() ? ns(team) : teamId(staticCode(job.installed()));
+            verifySignature(job.stagedAs(replacement), expected,
+                            "The replacement is not signed by the developer the switch requires (Team ID " + std::string(expected.UTF8String) + ").");
             require(bundleId(job.stagedAs(replacement)).length != 0, "The replacement has no bundle identifier.");
         }
 

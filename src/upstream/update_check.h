@@ -44,6 +44,8 @@ struct CheckResult {
     // is UpdateStatus::Replaced and the release fields above describe the replacement.
     std::string replacedBy;          // replacement file name
     std::string replacementOrigin;   // who declared it: "Info.plist" (the component) or "built in list"
+    std::string migration;           // https page with migration notes, "" when none
+    std::string replacementTeam;     // declared Team ID of the successor, "" when not declared
     bool replacementInstalled = false; // the replacement is installed too: switching only removes this one
     bool kept = false;               // the user keeps this component; the row is checked as usual
     std::string overlap;             // other installed components that do the same job, empty when none

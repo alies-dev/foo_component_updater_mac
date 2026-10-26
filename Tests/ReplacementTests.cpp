@@ -7,11 +7,11 @@ using namespace fcu;
 
 static void rejects(char const* json, char const* messagePart) {
     Replacement out;
-    out.dllName = "keep";
+    out.name = "keep";
     std::string err;
     CHECK(!parseReplacedBy(json, out, err), json);
     CHECK(err.rfind("Invalid FB2KReplacedBy: ", 0) == 0 && err.find(messagePart) != std::string::npos, (std::string(json) + " -> " + err).c_str());
-    CHECK(out.dllName == "keep", "previous value untouched on failure");
+    CHECK(out.name == "keep", "previous value untouched on failure");
 }
 
 int main() {
@@ -19,48 +19,60 @@ int main() {
     std::string err;
 
     g_context = "FB2KReplacedBy";
-    CHECK(parseReplacedBy("{\"dll\":\"Foo_New.dll\"}", r, err) && r.dllName == "foo_new" && !r.hasSource, "name only: the source is looked up like any component");
-    CHECK(parseReplacedBy("{\"dll\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\"}", r, err), "with a source");
-    CHECK(r.hasSource && r.source.dllName == "foo_new" && r.source.source == "github" && r.source.owner == "o" && r.source.repo == "r", "source belongs to the replacement");
-    CHECK(parseReplacedBy("{\"dll\":\"foo_new\",\"source\":\"hyv\",\"url\":\"https://foobar.hyv.fi/?view=foo_new\"}", r, err) && r.source.url.size(), "url source");
+    CHECK(parseReplacedBy("{\"component\":\"Foo_New.dll\"}", r, err) && r.name == "foo_new" && !r.hasSource && r.migration.empty() && r.team.empty(), "name only");
+    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\"}", r, err), "with a source");
+    CHECK(r.hasSource && r.source.dllName == "foo_new" && r.source.source == "github" && r.source.owner == "o" && r.source.repo == "r", "source belongs to the successor");
+    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"source\":\"hyv\",\"url\":\"https://foobar.hyv.fi/?view=foo_new\"}", r, err) && r.source.url.size(), "url source");
+    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"migration\":\"https://github.com/o/r#migrating\",\"team\":\"ABCDE12345\"}", r, err)
+          && r.migration == "https://github.com/o/r#migrating" && r.team == "ABCDE12345" && !r.hasSource, "migration and team are not source fields");
     rejects("{", "Invalid");
     rejects("null", "must be a dictionary");
-    rejects("{}", "\"dll\"");
-    rejects("{\"dll\":7}", "\"dll\"");
-    rejects("{\"dll\":\"\"}", "\"dll\"");
-    rejects("{\"dll\":\"../foo\"}", "\"dll\"");
-    rejects("{\"dll\":\".hidden\"}", "\"dll\"");
-    rejects("{\"dll\":\"foo_new\",\"why\":\"x\"}", "unknown field \"why\"");
-    rejects("{\"dll\":\"foo_new\",\"owner\":\"o\",\"repo\":\"r\"}", "\"source\" is required");
-    rejects("{\"dll\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\"}", "\"owner\" and \"repo\" are required");
-    rejects("{\"dll\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\",\"url\":\"https://x.y/\"}", "not \"url\"");
+    rejects("{}", "\"component\"");
+    rejects("{\"component\":7}", "\"component\"");
+    rejects("{\"component\":\"\"}", "\"component\"");
+    rejects("{\"component\":\"../foo\"}", "\"component\"");
+    rejects("{\"component\":\".hidden\"}", "\"component\"");
+    rejects("{\"component\":\"pending\"}", "\"component\"");
+    rejects("{\"component\":\"Core\"}", "\"component\"");
+    rejects("{\"component\":\"foo_\\u00e9\"}", "\"component\"");
+    rejects("{\"dll\":\"foo_new\"}", "unknown field \"dll\"");
+    rejects("{\"component\":\"foo_new\",\"why\":\"x\"}", "unknown field \"why\"");
+    rejects("{\"component\":\"foo_new\",\"owner\":\"o\",\"repo\":\"r\"}", "\"source\" is required");
+    rejects("{\"component\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\"}", "\"owner\" and \"repo\" are required");
+    rejects("{\"component\":\"foo_new\",\"source\":\"github\",\"owner\":\"o\",\"repo\":\"r\",\"url\":\"https://x.y/\"}", "not \"url\"");
+    rejects("{\"component\":\"foo_new\",\"migration\":\"http://x.y/\"}", "\"migration\"");
+    rejects("{\"component\":\"foo_new\",\"migration\":\"https://github.com@evil.example/\"}", "\"migration\"");
+    rejects("{\"component\":\"foo_new\",\"migration\":\"https://xn--gthub.com/\\u00e9\"}", "\"migration\"");
+    rejects("{\"component\":\"foo_new\",\"migration\":7}", "\"migration\"");
+    rejects("{\"component\":\"foo_new\",\"team\":\"abcde12345\"}", "\"team\"");
+    rejects("{\"component\":\"foo_new\",\"team\":\"ABCDE1234\"}", "\"team\"");
+    CHECK(parseReplacedBy("{\"component\":\"foo_new\",\"migration\":\"https://x.y/a?b=c@d\"}", r, err), "an @ after the host is fine");
 
     g_context = "lookup";
     std::map<std::string, Replacement> builtIn;
     Replacement listed;
-    listed.dllName = "foo_listed";
+    listed.name = "foo_listed";
     builtIn["foo_old"] = listed;
-    ReplacementLookup l = findReplacement("foo_old", true, "{\"dll\":\"foo_declared\"}", builtIn);
-    CHECK(l.origin == ReplacementOrigin::InfoPlist && l.replacement.dllName == "foo_declared", "the component's own key wins over the built in list");
+    ReplacementLookup l = findReplacement("foo_old", true, "{\"component\":\"foo_declared\"}", builtIn);
+    CHECK(l.origin == ReplacementOrigin::InfoPlist && l.replacement.name == "foo_declared", "the component's own key wins over the built in list");
     l = findReplacement("FOO_OLD", false, "", builtIn);
-    CHECK(l.origin == ReplacementOrigin::BuiltIn && l.replacement.dllName == "foo_listed", "built in list, names compared normalized");
-    l = findReplacement("foo_old", true, "{\"dll\":\"foo_declared\",\"extra\":1}", builtIn);
+    CHECK(l.origin == ReplacementOrigin::BuiltIn && l.replacement.name == "foo_listed", "built in list, names compared normalized");
+    l = findReplacement("foo_old", true, "{\"component\":\"foo_declared\",\"extra\":1}", builtIn);
     CHECK(l.origin == ReplacementOrigin::BuiltIn && l.note.find("unknown field") != std::string::npos, "an invalid key is noted and the list is used");
-    l = findReplacement("foo_x", true, "{\"dll\":\"FOO_X\"}", builtIn);
+    l = findReplacement("foo_x", true, "{\"component\":\"FOO_X\"}", builtIn);
     CHECK(l.origin == ReplacementOrigin::None && l.note.find("itself") != std::string::npos, "a component is not its own replacement");
     l = findReplacement("foo_other", false, "", builtIn);
     CHECK(l.origin == ReplacementOrigin::None && l.note.empty(), "nothing declared");
-    l = findReplacement("Core", true, "{\"dll\":\"foo_new\"}", builtIn);
+    l = findReplacement("Core", true, "{\"component\":\"foo_new\"}", builtIn);
     CHECK(l.origin == ReplacementOrigin::None, "built in components are never replaced");
-
     g_context = "built in list extras";
     std::vector<ComponentGroup> groups;
     parseBuiltInExtras(R"({"components":[
         {"dll":"foo_a","source":"github","owner":"o","repo":"r"},
-        {"dll":"foo_b","replaced_by":{"dll":"foo_c","source":"github","owner":"o","repo":"c"}},
-        {"dll":"foo_d","replaced_by":{"dll":"foo_e","source":"github"}},
-        {"dll":"foo_f","replaced_by":{"dll":"foo_f"}},
-        {"dll":"../x","replaced_by":{"dll":"foo_g"}}],
+        {"dll":"foo_b","replaced_by":{"component":"foo_c","source":"github","owner":"o","repo":"c"}},
+        {"dll":"foo_d","replaced_by":{"component":"foo_e","source":"github"}},
+        {"dll":"foo_f","replaced_by":{"component":"foo_f"}},
+        {"dll":"../x","replaced_by":{"component":"foo_g"}}],
       "groups":[{"title":"Scrobbler","members":["foo_s1","FOO_S2.dll"]},
                 {"title":"Alone","members":["foo_s1"]},
                 {"title":"","members":["foo_s1","foo_s2"]},

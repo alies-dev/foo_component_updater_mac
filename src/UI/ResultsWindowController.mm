@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "../Integration/MigrationNotes.h"
 #include "../Integration/Settings.h"
 #include "../upstream/automatic_check.h"
 #include "DebugSnapshot.h"
@@ -15,6 +16,17 @@ NSNotificationName const FCUUpdateCheckCompletedNotification = @"FCUUpdateCheckC
 namespace {
 
 NSString *ns(std::string const& s) { return [NSString stringWithUTF8String:s.c_str()] ?: @""; }
+
+// Text from a remote source in a dialog that asks for consent: printable ASCII only (no line or direction
+// controls that could fake a line), cut at `limit` characters.
+NSString *plain(std::string const& s, size_t limit = 40) {
+    std::string out;
+    for (char c : s) {
+        if (c >= 0x20 && c < 0x7f) out += c;
+    }
+    if (out.size() > limit) out = out.substr(0, limit) + "...";
+    return ns(out);
+}
 
 NSDate *releasedDate(std::string const& iso) {
     static NSISO8601DateFormatter *parser = [NSISO8601DateFormatter new];
@@ -121,6 +133,7 @@ bool g_installing = false; // an install or restore runs; it holds the update ch
 struct Operation {
     std::string name, installedVersion, url; // url empty: restore the backup (unless replacement is set)
     std::string replacement;                 // set: switch to that component (url may be empty when it is installed)
+    std::string team, migration;             // of a switch: declared Team ID and migration notes page, "" when none
 };
 
 // Main thread, once the worker is done. The window (if any is open) shows the outcome;
@@ -134,7 +147,11 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     NSMutableArray<NSString *> *failed = [NSMutableArray array];
     int staged = 0;
     for (size_t i = 0; i < jobs.size(); ++i) {
-        if (outcomes[i].ok) { ++staged; continue; }
+        if (outcomes[i].ok) {
+            ++staged;
+            if (!jobs[i].replacement.empty() && !jobs[i].migration.empty()) RememberMigrationNote({jobs[i].name, jobs[i].replacement, jobs[i].migration});
+            continue;
+        }
         failures[ns(jobs[i].name)] = ns(outcomes[i].message);
         [failed addObject:[NSString stringWithFormat:@"%@: %@", ns(jobs[i].name), ns(outcomes[i].message)]];
     }
@@ -163,6 +180,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     NSArray<FCUResultRow *> *_rows;
     NSString *_emptyMessage;
     BOOL _attached; // waiting for a check that started elsewhere (the automatic one)
+    NSArray<NSURL *> *_migrationLinks; // links of the open switch confirmation, by button tag
 }
 
 - (instancetype)initWithEmptyMessage:(NSString *)message {
@@ -449,43 +467,78 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
 - (void)installChecked:(id)sender {
     std::vector<Operation> jobs;
     NSMutableArray<NSString *> *switches = [NSMutableArray array];
+    NSMutableArray<NSURL *> *notes = [NSMutableArray array];
+    NSMutableArray<NSString *> *noteTitles = [NSMutableArray array];
+    CheckResult const *only = nullptr;
     for (CheckResult const &r : _results) {
         if (![_checked containsObject:ns(r.dllName)]) continue;
         if (r.status != UpdateStatus::Replaced) {
-            jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl, ""});
+            jobs.push_back({r.dllName, r.installedVersion, r.downloadUrl, "", "", ""});
             continue;
         }
+        only = &r;
         bool const present = successorPresent(r);
-        jobs.push_back({r.dllName, r.installedVersion, present ? "" : r.downloadUrl, r.replacedBy});
-        NSString *what = present
-            ? [NSString stringWithFormat:@"%@ %@ will be removed; %@ is already installed.", ns(r.dllName), ns(r.installedVersion), ns(r.replacedBy)]
-            : [NSString stringWithFormat:@"%@ %@ will be removed and %@ %@ from %@ installed.", ns(r.dllName), ns(r.installedVersion),
-                  ns(r.replacedBy), ns(r.latestVersion), ns(r.sourceLabel)];
-        NSString *who = r.replacementOrigin == "Info.plist" ? [NSString stringWithFormat:@"Declared by %@ itself.", ns(r.dllName)]
-            : @"Declared by the built in list of this updater.";
-        [switches addObject:[NSString stringWithFormat:@"%@ %@", what, who]];
+        jobs.push_back({r.dllName, r.installedVersion, present ? "" : r.downloadUrl, r.replacedBy, r.replacementTeam, r.migration});
+        // One fact per line, the source on its own: a remote version string cannot run into it.
+        NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObject:
+            [NSString stringWithFormat:@"%@ %@ will be removed.", ns(r.dllName), plain(r.installedVersion)]];
+        if (present) {
+            [lines addObject:[NSString stringWithFormat:@"%@ is already installed.", ns(r.replacedBy)]];
+        } else {
+            [lines addObject:[NSString stringWithFormat:@"%@ %@ will be installed.", ns(r.replacedBy), plain(r.latestVersion)]];
+            [lines addObject:[NSString stringWithFormat:@"From: %@", plain(r.sourceLabel, 80)]];
+        }
+        [lines addObject:r.replacementOrigin == "Info.plist" ? [NSString stringWithFormat:@"Declared by %@ itself.", ns(r.dllName)]
+            : @"Declared by the built in list of this updater."];
+        [switches addObject:[lines componentsJoinedByString:@"\n"]];
+        NSURL *note = r.migration.empty() ? nil : [NSURL URLWithString:ns(r.migration)];
+        if (note.host.length) {
+            [notes addObject:note];
+            [noteTitles addObject:[NSString stringWithFormat:@"Migration notes for %@ (%@)", ns(r.replacedBy), note.host]];
+        }
     }
     // A switch removes a component, so it is confirmed; plain updates are not.
     if (switches.count && keepsWindowState()) {
         NSAlert *alert = [NSAlert new];
-        CheckResult const *only = nullptr;
-        for (CheckResult const &r : _results) {
-            if ([_checked containsObject:ns(r.dllName)] && r.status == UpdateStatus::Replaced) only = &r;
-        }
         alert.messageText = switches.count == 1 ? [NSString stringWithFormat:@"Switch %@ to %@?", ns(only->dllName), ns(only->replacedBy)]
             : [NSString stringWithFormat:@"Switch %lu components?", (unsigned long)switches.count];
         alert.informativeText = [[switches componentsJoinedByString:@"\n\n"]
             stringByAppendingString:@"\n\nSettings are not carried over. The changes apply when foobar2000 restarts."];
+        // Links read before deciding; each opens in the browser only when clicked.
+        _migrationLinks = notes;
+        if (notes.count) {
+            NSStackView *stack = [NSStackView stackViewWithViews:@[]];
+            stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+            stack.alignment = NSLayoutAttributeLeading;
+            for (NSUInteger i = 0; i < notes.count; ++i) {
+                NSButton *link = [NSButton buttonWithTitle:noteTitles[i] target:self action:@selector(openMigrationLink:)];
+                link.bordered = NO;
+                link.tag = (NSInteger)i;
+                link.toolTip = notes[i].absoluteString;
+                link.attributedTitle = [[NSAttributedString alloc] initWithString:noteTitles[i] attributes:@{
+                    NSForegroundColorAttributeName: NSColor.linkColor, NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)}];
+                [stack addArrangedSubview:link];
+            }
+            [stack layoutSubtreeIfNeeded];
+            stack.frame = NSMakeRect(0, 0, 300, stack.fittingSize.height);
+            alert.accessoryView = stack;
+        }
         [alert addButtonWithTitle:@"Switch"];
         [alert addButtonWithTitle:@"Cancel"];
-        if ([alert runModal] != NSAlertFirstButtonReturn) return;
+        NSModalResponse answer = [alert runModal];
+        _migrationLinks = nil;
+        if (answer != NSAlertFirstButtonReturn) return;
     }
     [self runOperations:jobs];
 }
 
+- (void)openMigrationLink:(NSButton *)sender {
+    if (sender.tag >= 0 && sender.tag < (NSInteger)_migrationLinks.count) [[NSWorkspace sharedWorkspace] openURL:_migrationLinks[sender.tag]];
+}
+
 - (void)restorePrevious:(NSMenuItem *)item {
     FCUResultRow *row = item.representedObject;
-    [self runOperations:{{row.name.UTF8String, row.installed.UTF8String, "", ""}}];
+    [self runOperations:{{row.name.UTF8String, row.installed.UTF8String, "", "", "", ""}}];
 }
 
 // Keeping a replaced component (or no longer keeping it) changes what its row checks, so the check runs again.
@@ -511,7 +564,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
                     : [NSString stringWithFormat:@"%@ %@", op.url.empty() ? @"Restoring" : @"Installing", ns(op.name)];
                 [g_controller setStatus:[NSString stringWithFormat:@"%@ (%zu of %zu)...", what, i + 1, count]];
             });
-            outcomes.push_back(!op.replacement.empty() ? fcu::switchComponent(op.name, op.replacement, op.url, abort)
+            outcomes.push_back(!op.replacement.empty() ? fcu::switchComponent(op.name, op.replacement, op.url, op.team, abort)
                                : op.url.empty() ? fcu::restorePrevious(op.name, op.installedVersion, abort)
                                                 : fcu::installUpdate(op.name, op.installedVersion, op.url, abort));
         }

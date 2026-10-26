@@ -338,7 +338,9 @@ void RunChecks(
 
         fcu::ReplacementLookup rl = fcu::findReplacement(comp.fileName, comp.hasReplacedBy, comp.replacedByJson, listedReplacements);
         if (rl.origin != fcu::ReplacementOrigin::None) {
-            r.replacedBy = rl.replacement.dllName;
+            r.replacedBy = rl.replacement.name;
+            r.migration = rl.replacement.migration;
+            r.replacementTeam = rl.replacement.team;
             r.replacementOrigin = rl.origin == fcu::ReplacementOrigin::InfoPlist ? "Info.plist" : "built in list";
             r.kept = IsReplacementKept(comp.fileName, r.replacedBy);
         }
@@ -354,15 +356,21 @@ void RunChecks(
                 results.push_back(std::move(r));
                 continue;
             }
-            fcu::ResolvedSource rs;
-            if (rl.replacement.hasSource) {
+            // Only the built in list or the declaration itself may say where the successor's code comes from; there is
+            // no identity to compare it with. A name the built in list knows keeps that source, so a declaration cannot
+            // install an impostor under a trusted name. Neither the shared registry nor the catalog is consulted.
+            fcu::SourceLists listed;
+            listed.builtIn = lists.builtIn;
+            fcu::ResolvedSource rs = fcu::resolveSource(r.replacedBy, {}, listed);
+            if (rs.origin != fcu::SourceOrigin::BuiltIn && rl.replacement.hasSource) {
                 rs.origin = rl.origin == fcu::ReplacementOrigin::InfoPlist ? fcu::SourceOrigin::InfoPlist : fcu::SourceOrigin::BuiltIn;
                 rs.entry = rl.replacement.source;
-            } else {
-                // Not through the shared registry: it is third party and could point a trusted declaration at other code.
-                fcu::SourceLists trusted;
-                trusted.builtIn = lists.builtIn;
-                rs = fcu::resolveSource(r.replacedBy, {}, trusted);
+                rs.invalid.clear();
+            }
+            if (rs.origin == fcu::SourceOrigin::Catalog) {
+                AddNote(r, "No source of " + r.replacedBy + " was declared, so it cannot be installed from here.");
+                results.push_back(std::move(r));
+                continue;
             }
             r.sourceOrigin = fcu::originLabel(rs.origin);
             r.sourceLabel = SourceLabel(rs.entry);
@@ -371,7 +379,7 @@ void RunChecks(
             } else {
                 r.status = UpdateStatus::Error;
                 r.errorMessage = "Check cancelled.";
-                jobs.push_back({results.size(), rs.entry, rs.origin, rs.origin == fcu::SourceOrigin::Catalog, r.replacedBy, true});
+                jobs.push_back({results.size(), rs.entry, rs.origin, false, r.replacedBy, true});
             }
             results.push_back(std::move(r));
             continue;
@@ -421,7 +429,7 @@ void RunChecks(
         for (size_t j : group.second) {
             CheckResult& r = results[jobs[j].row];
             fcu::AssetOutcome const& outcome = outcomes[jobs[j].key];
-            if (!fcu::fallsThroughToCatalog(jobs[j].origin, outcome.kind)) {
+            if (jobs[j].replacement || !fcu::fallsThroughToCatalog(jobs[j].origin, outcome.kind)) {
                 ApplyGitHubOutcome(r, outcome);
                 continue;
             }

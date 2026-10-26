@@ -1,6 +1,7 @@
 #include "../fb2k_sdk.h"
 #include "third_party/nlohmann/json.hpp"
 #include "remote_registry.h"
+#include "../Core/list_entry.h"
 #include "../Platform/fcu_http.h"
 
 #include <algorithm>
@@ -74,7 +75,7 @@ std::vector<RemoteRegistryEntry> parseEntries(nlohmann::json const& parsed) {
     std::vector<RemoteRegistryEntry> result;
     for (auto const& item : parsed["components"]) {
         RemoteRegistryEntry entry;
-        entry.dllName = item.value("dll", "");
+        entry.dllName = fcu::listEntryName(item);
         entry.source = item.value("source", "");
         entry.owner = item.value("owner", "");
         entry.repo = item.value("repo", "");

@@ -11,15 +11,17 @@ namespace {
 
 bool isIdentifier(std::string const& s) {
     if (s.empty() || s.size() > 128) return false;
-    for (char c : s) {
-        unsigned char u = static_cast<unsigned char>(c);
-        if (!(std::isalnum(u) || c == '.' || c == '_' || c == '-')) return false;
-    }
-    return true;
+    return std::all_of(s.begin(), s.end(), [](char c) { return isAsciiAlnum(c) || c == '.' || c == '_' || c == '-'; });
 }
 
 bool isUrlSource(std::string const& source) {
     return source == "marc2k3" || source == "sourceforge" || source == "hyv";
+}
+
+} // namespace
+
+bool isAsciiAlnum(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
 }
 
 bool isHttpsUrl(std::string const& url) {
@@ -28,6 +30,8 @@ bool isHttpsUrl(std::string const& url) {
     return std::none_of(url.begin(), url.end(), [](unsigned char c) { return c <= 0x20 || c == 0x7f; })
         && url[prefix.size()] != '/';
 }
+
+namespace {
 
 bool readString(nlohmann::json const& obj, char const* key, std::string& out, std::string& error) {
     auto it = obj.find(key);

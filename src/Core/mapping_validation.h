@@ -11,6 +11,12 @@ std::string normalizeComponentName(std::string name);
 
 bool isSupportedSource(std::string const& source);
 
+// [A-Za-z0-9] whatever the C locale says (std::isalnum would accept Latin-1 bytes in some locales).
+bool isAsciiAlnum(char c);
+
+// "https://" followed by a host, at most 2048 bytes, no whitespace or control characters.
+bool isHttpsUrl(std::string const& url);
+
 // Fields a source needs before any URL is built from it: owner and repo matching
 // [A-Za-z0-9._-]+ for github, gitlab and codeberg, an https:// url for the rest.
 // Mixed fields (url with github, owner or repo with a url source) are rejected, so the

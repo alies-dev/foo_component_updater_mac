@@ -158,14 +158,16 @@ def m2(run, log, previous_pid):
     elif run == "m2-team":
         refused(log, "other_developer", "different developer")
         refused(log, "forged_team", "different developer")
+        refused(log, "switch_other_developer", "not signed by the developer the switch requires (Team ID 9UF72C5LAW)")
         check("a package from the same Team ID is staged", o["same_developer"]["ok"] is True and after["staged"] is True, log)
     elif run == "m2-switch":
         kept, row, ng = log["kept_row"], log["row"], log["replacement_before"]
         check("kept: foo_abx is checked as usual (catalog, up to date) and says what it keeps",
               (kept["status"], kept["kept"], kept["replaced_by"]) == ("up_to_date", True, "foo_abx_ng") and "you keep this component" in kept["note"], kept)
-        check("foo_abx shows Replaced by foo_abx_ng 1.0.0 from its own Info.plist and is installable",
-              (row["status"], row["replaced_by"], row["origin"], row["latest"], row["source"], row["asset"], row["block_reason"])
-              == ("replaced", "foo_abx_ng", "Info.plist", "1.0.0", "fcu-test/foo_abx_ng", "foo_abx_ng.fb2k-component", ""), row)
+        check("foo_abx shows Replaced by foo_abx_ng 1.0.0 from its own Info.plist, with migration notes, and is installable",
+              (row["status"], row["replaced_by"], row["origin"], row["latest"], row["source"], row["asset"], row["block_reason"], row["migration"])
+              == ("replaced", "foo_abx_ng", "Info.plist", "1.0.0", "fcu-test/foo_abx_ng", "foo_abx_ng.fb2k-component", "",
+                  "https://github.com/fcu-test/foo_abx_ng#migrating"), row)
         check("start state: foo_abx 2.2.3 installed, foo_abx_ng absent, nothing pending",
               (before["installed_version"], before["staged"], before["removal_staged"], ng["installed_version"], ng["staged"]) == ("2.2.3", False, False, "", False), log)
         check("the switch staged foo_abx_ng and the removal of foo_abx",
@@ -175,6 +177,9 @@ def m2(run, log, previous_pid):
         ng = log["replacement_before"]
         check("after the restart foo_abx is gone and foo_abx_ng 2.2.3 runs, nothing pending",
               (before["installed_version"], before["removal_staged"], ng["installed_version"], ng["staged"]) == ("", False, "2.2.3", False), log)
+        check("the migration notes of the applied switch are offered once",
+              log["migration_notes"] == [{"from": "foo_abx", "to": "foo_abx_ng", "url": "https://github.com/fcu-test/foo_abx_ng#migrating"}]
+              and log["migration_notes_again"] == 0, log)
     sys.exit(1 if failures else 0)
 
 

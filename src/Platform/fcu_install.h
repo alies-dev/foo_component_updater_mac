@@ -24,11 +24,13 @@ InstallOutcome installUpdate(std::string const& name, std::string const& install
 InstallOutcome restorePrevious(std::string const& name, std::string const& installedVersion, abort_callback& abort);
 
 // Replaces component `name` with the different component `replacement` at the next start: the package at `url`
-// goes to pending/<replacement> (signature checked, no identity to compare with) and pending/<name> becomes an
-// uninstall marker. With an empty `url` (the replacement is installed or staged already) only the marker is written.
+// goes to pending/<replacement> and pending/<name> becomes an uninstall marker. There is no bundle identifier to
+// compare; the signature must chain to `team` (the declared Team ID) or, when that is empty, to the Team ID of the
+// installed `name` when it has one. A replacement folder on disk that the check did not see loaded is refused.
+// With an empty `url` (the replacement is installed or staged already) only the marker is written.
 // No backup is kept: once removed, `name` is no longer listed. Same rules as installUpdate otherwise.
 InstallOutcome switchComponent(std::string const& name, std::string const& replacement, std::string const& url,
-                               abort_callback& abort);
+                               std::string const& team, abort_callback& abort);
 
 // pending/<name>/<name>.component exists: an install that waits for a restart.
 bool isStaged(std::string const& name);
