@@ -150,6 +150,9 @@ void ApplyGitHubOutcome(CheckResult& r, fcu::AssetOutcome const& o) {
     r.releaseUrl = o.match.releaseUrl;
     r.downloadUrl = o.match.downloadUrl;
     r.assetName = o.match.assetName;
+    r.prerelease = o.match.prerelease;
+    r.releaseNotes = o.match.notes;
+    r.releasedAt = o.match.publishedAt;
     if (o.match.version.empty()) {
         r.latestVersion = o.match.tag;
         r.status = UpdateStatus::ComparisonUnsupported;
@@ -228,15 +231,17 @@ std::vector<InstalledComponentInfo> GetInstalledComponents() {
     std::vector<InstalledComponentInfo> installed;
 
     for (auto ptr : componentversion::enumerate()) {
-        pfc::string8 fileName, name, version;
+        pfc::string8 fileName, name, version, about;
         ptr->get_file_name(fileName);
         ptr->get_component_name(name);
         ptr->get_component_version(version);
+        ptr->get_about_message(about);
 
         InstalledComponentInfo info;
         info.fileName = fileName.c_str();
         info.displayName = name.c_str();
         info.installedVersion = version.c_str();
+        info.about = fcu::textPreview(about.c_str());
         if (info.fileName != "Core") {
             info.hasBundleSource = fcu::readBundleUpdateSource(info.fileName, info.bundleSourceJson);
         }
@@ -298,6 +303,7 @@ void RunChecks(
         r.dllName = comp.fileName;
         r.displayName = comp.displayName;
         r.installedVersion = comp.installedVersion;
+        r.about = comp.about;
 
         fcu::ResolvedSource rs = fcu::resolveSource(comp.fileName, {comp.hasBundleSource, comp.bundleSourceJson}, lists);
         r.note = rs.note;

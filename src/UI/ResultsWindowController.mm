@@ -16,6 +16,19 @@ namespace {
 
 NSString *ns(std::string const& s) { return [NSString stringWithUTF8String:s.c_str()] ?: @""; }
 
+// "2 Oct 2026" style in the user's locale; "" when GitHub gave no usable date.
+NSString *releasedText(std::string const& iso) {
+    static NSISO8601DateFormatter *parser = [NSISO8601DateFormatter new];
+    static NSDateFormatter *formatter = [] {
+        NSDateFormatter *f = [NSDateFormatter new];
+        f.dateStyle = NSDateFormatterMediumStyle;
+        f.timeStyle = NSDateFormatterNoStyle;
+        return f;
+    }();
+    NSDate *date = iso.empty() ? nil : [parser dateFromString:ns(iso)];
+    return date ? [formatter stringFromDate:date] : @"";
+}
+
 int statusRank(UpdateStatus s) {
     switch (s) {
     case UpdateStatus::UpdateAvailable: return 0;
@@ -41,7 +54,8 @@ NSString *statusText(UpdateStatus s) {
 }
 
 @interface FCUResultRow : NSObject
-@property (copy) NSString *component, *installed, *latest, *status, *source, *tooltip, *releaseUrl;
+@property (copy) NSString *component, *installed, *latest, *released, *status, *source, *tooltip, *releaseUrl, *releaseNotes, *about;
+@property BOOL prerelease;
 @property (copy) NSString *name, *blockReason, *backupVersion; // file name, why not installable ("" when it is), backup version ("" when none)
 @property UpdateStatus statusCode;
 @property BOOL staged, failed;
@@ -137,7 +151,7 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
 }
 
 - (instancetype)initWithEmptyMessage:(NSString *)message {
-    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1020, 460)
+    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 920, 460)
         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
         backing:NSBackingStoreBuffered defer:NO];
     window.title = @"Component Updates";
@@ -169,21 +183,21 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
     _table = [[NSTableView alloc] initWithFrame:scroll.bounds];
     struct Col { NSString *ident, *title; CGFloat width; };
     for (Col c : {Col{@"update", @"Update", 56}, Col{@"component", @"Component", 230}, Col{@"installed", @"Installed", 80},
-                  Col{@"latest", @"Latest", 80}, Col{@"status", @"Status", 120}, Col{@"source", @"Source", 250},
+                  Col{@"latest", @"Latest", 100}, Col{@"released", @"Released", 96}, Col{@"status", @"Status", 120},
                   Col{@"notes", @"Notes", 112}}) {
         NSTableColumn *col = [[NSTableColumn alloc] initWithIdentifier:c.ident];
         col.title = c.title;
         col.width = c.width;
         col.minWidth = 40;
-        // Component and Source take the spare width; the other columns keep theirs, so
+        // Component takes the spare width; the other columns keep theirs, so
         // "Release notes" is never squeezed at the default window width.
-        bool flexible = [c.ident isEqualToString:@"component"] || [c.ident isEqualToString:@"source"];
+        bool flexible = [c.ident isEqualToString:@"component"];
         col.resizingMask = flexible ? (NSTableColumnAutoresizingMask | NSTableColumnUserResizingMask) : NSTableColumnUserResizingMask;
         [_table addTableColumn:col];
     }
     _table.columnAutoresizingStyle = NSTableViewUniformColumnAutoresizingStyle;
     if (keepsWindowState()) {
-        _table.autosaveName = @"FCUResultsTable";
+        _table.autosaveName = @"FCUResultsTable2"; // new name: the saved layout had a Source column
         _table.autosaveTableColumns = YES;
     }
     _table.dataSource = self;
@@ -323,7 +337,13 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         row.component = r->dllName.empty() ? ns(r->displayName)
             : [NSString stringWithFormat:@"%@ (%@)", ns(r->displayName), r->dllName == "Core" ? @"built in" : ns(r->dllName)];
         row.installed = ns(r->installedVersion);
-        row.latest = ns(r->latestVersion);
+        // A version like "2.0.0-beta" already says so; only a plain number gets the mark.
+        bool marked = r->prerelease && r->latestVersion.find('-') == std::string::npos;
+        row.latest = marked ? [NSString stringWithFormat:@"%@ (beta)", ns(r->latestVersion)] : ns(r->latestVersion);
+        row.prerelease = r->prerelease;
+        row.releaseNotes = ns(r->releaseNotes);
+        row.released = releasedText(r->releasedAt);
+        row.about = ns(r->about);
         row.status = statusText(r->status);
         row.statusCode = r->status;
         row.source = r->sourceOrigin.empty() ? @"" : [NSString stringWithFormat:@"%@ (%@)", ns(r->sourceLabel), ns(r->sourceOrigin)];
@@ -535,17 +555,31 @@ void finishOperation(std::vector<Operation> const& jobs, std::vector<fcu::Instal
         field.identifier = ident;
         field.lineBreakMode = NSLineBreakByTruncatingTail;
     }
-    field.toolTip = row.tooltip;
+    NSString *cellTip = nil; // what this cell adds; the row's note or error follows it
     field.textColor = (row.statusCode == UpdateStatus::Error || row.failed) && [ident isEqualToString:@"status"] ? NSColor.systemRedColor : NSColor.labelColor;
     field.font = [ident isEqualToString:@"status"] && row.statusCode == UpdateStatus::UpdateAvailable
         ? [NSFont boldSystemFontOfSize:NSFont.systemFontSize] : [NSFont systemFontOfSize:NSFont.systemFontSize];
 
-    if ([ident isEqualToString:@"component"]) field.stringValue = row.component;
+    if ([ident isEqualToString:@"component"]) {
+        field.stringValue = row.component;
+        if (row.about.length) cellTip = row.about;
+    }
+    else if ([ident isEqualToString:@"released"]) field.stringValue = row.released;
     else if ([ident isEqualToString:@"installed"]) field.stringValue = row.installed;
-    else if ([ident isEqualToString:@"latest"]) field.stringValue = row.latest;
+    else if ([ident isEqualToString:@"latest"]) {
+        field.stringValue = row.latest;
+        NSMutableArray<NSString *> *lines = [NSMutableArray array];
+        if (row.source.length) [lines addObject:[@"From " stringByAppendingString:row.source]];
+        if (row.prerelease) [lines addObject:@"The author marked this release as a prerelease. It may be less stable."];
+        if (lines.count) cellTip = [lines componentsJoinedByString:@"\n"];
+    }
     else if ([ident isEqualToString:@"status"]) field.stringValue = row.status;
-    else if ([ident isEqualToString:@"source"]) field.stringValue = row.source;
-    else field.stringValue = row.releaseUrl.length ? @"Release notes" : @"";
+    else {
+        field.stringValue = row.releaseUrl.length ? @"Release notes" : @"";
+        if (row.releaseNotes.length) cellTip = row.releaseNotes;
+    }
+    field.toolTip = cellTip.length && row.tooltip.length ? [NSString stringWithFormat:@"%@\n\n%@", cellTip, row.tooltip]
+        : cellTip.length ? cellTip : row.tooltip;
     return field;
 }
 
