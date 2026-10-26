@@ -19,7 +19,7 @@
 #include "Settings.h"
 #include "../Platform/fcu_http.h"
 #include "../UI/PreferencesController.h"
-#include "../UI/ResultsWindow.h"
+#include "../UI/UpdatesPage.h"
 #include "../UI/DebugSnapshot.h"
 #include "../Core/package_layout.h"
 #include "PeriodicCheck.h"
@@ -124,7 +124,7 @@ json lastCheckRefreshChecks() {
             {"refreshed_when_visible", ![after isEqualToString:before]}, {"not_refreshed_when_hidden", [hidden isEqualToString:after]}};
 }
 
-// Off screen renders of the preferences page and the results window (see Scripts/test_batch.sh).
+// Off screen renders of the preferences page, settings and updates table (see Scripts/test_batch.sh).
 json snapshots(std::vector<CheckResult> const& results) {
     json j;
     // Render the defaults, whatever earlier runs of the batch left in the profile; restored below.
@@ -142,9 +142,9 @@ json snapshots(std::vector<CheckResult> const& results) {
     j["prefs_dark"] = DebugWriteSnapshot(view, NSAppearanceNameDarkAqua, path("prefs-dark.png"));
     j["prefs_help_popover"] = DebugWriteSnapshot(FCUMakeHelpContentView(), NSAppearanceNameAqua, path("prefs-help-popover.png"));
     j["prefs_size"] = {view.frame.size.width, view.frame.size.height};
-    j["results_default_rows"] = DebugSnapshotResultsWindow(results, false, path("results-default.png").UTF8String);
-    j["results_layout"] = DebugLastResultsLayout();
-    j["results_core_shown_rows"] = DebugSnapshotResultsWindow(results, true, path("results-core-shown.png").UTF8String);
+    j["results_default_rows"] = DebugSnapshotUpdatesPage(results, false, path("results-default.png").UTF8String);
+    j["results_layout"] = DebugLastUpdatesLayout();
+    j["results_core_shown_rows"] = DebugSnapshotUpdatesPage(results, true, path("results-core-shown.png").UTF8String);
     SetAutomaticCheckIntervalDays(savedDays);
     SetIncludePrereleases(savedPre);
     SetAutomaticCheckEnabled(savedAuto);
@@ -162,7 +162,7 @@ void afterSeconds(double seconds, std::function<void()> next) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ next(); });
 }
 
-// Calls next once no check is running (bounded), then a moment later so window callbacks have landed.
+// Calls next once no check is running (bounded), then a moment later so page callbacks have landed.
 void whenIdle(std::function<void()> next, int polls = 150) {
     if (IsUpdateCheckRunning() && polls > 0) {
         afterSeconds(0.2, [next, polls] { whenIdle(next, polls - 1); });
@@ -171,7 +171,7 @@ void whenIdle(std::function<void()> next, int polls = 150) {
     afterSeconds(0.3, next);
 }
 
-// The manual entry point, the periodic evaluation and the window attach rules, with counters (see Scripts/test_batch_check.py,
+// The manual entry point, the periodic evaluation and the page attach rules, with counters (see Scripts/test_batch_check.py,
 // run "triggers"), and a check that foobar2000's own update menu titles start nothing.
 // Runs only when foo_component_updater_mac.debug.recheck_seconds is set; restores the settings it touches.
 void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
@@ -185,16 +185,31 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
     bool savedAuto = GetAutomaticCheckEnabled();
     int savedDays = GetAutomaticCheckIntervalDays();
 
-    auto finish = [=] {
+    auto writeLog = [=] {
         SetAutomaticCheckEnabled(savedAuto);
         SetAutomaticCheckIntervalDays(savedDays);
         (*log)["triggers"] = *state;
         done();
     };
 
+    // Last step: the real Preferences window shows our page; foobar2000 must size it to its pane.
+    auto finish = [=] {
+        ui_control::get()->show_preferences(fcu::guid_preferences_page);
+        afterSeconds(1.5, [=] {
+            std::string text = [FCUDebugShownPreferencesGeometry() UTF8String] ?: "";
+            double pageW = -1, pageH = -1, superW = -1, superH = -1, updatesH = -1;
+            sscanf([FCUDebugShownPreferencesNumbers() UTF8String] ?: "", "%lf %lf %lf %lf %lf", &pageW, &pageH, &superW, &superH, &updatesH);
+            (*state)["host_geometry"] = text;
+            (*state)["host_geometry_numbers"] = {{"page_w", pageW}, {"page_h", pageH}, {"super_w", superW}, {"super_h", superH},
+                                                 {"updates_h", updatesH}};
+            FCUDebugClosePreferencesWindow();
+            afterSeconds(0.3, writeLog);
+        });
+    };
+
     // 4. Two evaluations back to back with a due check: the second must not start a concurrent check.
     auto concurrent = [=] {
-        DebugCloseResultsWindow();
+        DebugHideUpdatesPage();
         DebugSetAutomaticCheckLastRun((int64_t)time(nullptr) - 3 * 86400);
         *begun0 = DebugChecksBegun();
         bool first = EvaluateAutomaticCheck();
@@ -202,35 +217,35 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         (*state)["concurrent"] = {{"first_started", first}, {"second_started", second}, {"running_after", IsUpdateCheckRunning()}};
         whenIdle([=] {
             (*state)["concurrent"]["begun_delta"] = DebugChecksBegun() - *begun0;
-            DebugCloseResultsWindow();
+            DebugHideUpdatesPage();
             finish();
         });
     };
 
-    // 4d. A window attached to an automatic check and then closed must not be recreated when that check completes.
+    // 4d. A page attached to an automatic check and then hidden must not be shown again when that check completes.
     auto dismiss = [=] {
-        DebugCloseResultsWindow();
+        DebugHideUpdatesPage();
         DebugSetAutomaticCheckLastRun((int64_t)time(nullptr) - 3 * 86400);
         *begun0 = DebugChecksBegun();
         bool started = EvaluateAutomaticCheck();
-        ShowUpdateResultWindow();
+        ShowUpdatesPage();
         afterSeconds(0.02, [=] {
             bool attachedBefore = false;
-            long rowsBefore = DebugResultsWindowRows(&attachedBefore);
-            DebugCloseResultsWindow();
-            bool runningAfterClose = IsUpdateCheckRunning();
-            // Reopen and close again while the same check still runs: it attaches to that check (no second
-            // one can begin until it is delivered), and the second close dismisses it again.
-            ShowUpdateResultWindow();
+            long rowsBefore = DebugUpdatesPageRows(&attachedBefore);
+            DebugHideUpdatesPage();
+            bool runningAfterHide = IsUpdateCheckRunning();
+            // Show and hide again while the same check still runs: it attaches to that check (no second
+            // one can begin until it is delivered), and the second hide dismisses it again.
+            ShowUpdatesPage();
             afterSeconds(0.02, [=] {
             bool reopenedAttached = false;
-            long reopenedRows = DebugResultsWindowRows(&reopenedAttached);
-            DebugCloseResultsWindow();
+            long reopenedRows = DebugUpdatesPageRows(&reopenedAttached);
+            DebugHideUpdatesPage();
             whenIdle([=] {
                 bool a = false;
-                long rowsAfter = DebugResultsWindowRows(&a);
-                (*state)["dismiss"] = {{"reopened_attached_to_same_check", reopenedRows >= 0 && reopenedAttached},{"auto_started", started}, {"window_attached_before_close", rowsBefore >= 0 && attachedBefore},
-                                       {"running_after_close", runningAfterClose}, {"window_open_after_completion", rowsAfter >= 0},
+                long rowsAfter = DebugUpdatesPageRows(&a);
+                (*state)["dismiss"] = {{"reopened_attached_to_same_check", reopenedRows >= 0 && reopenedAttached},{"auto_started", started}, {"page_attached_before_hide", rowsBefore >= 0 && attachedBefore},
+                                       {"running_after_hide", runningAfterHide}, {"page_visible_after_completion", rowsAfter >= 0},
                                        {"begun_delta", DebugChecksBegun() - *begun0}};
                 concurrent();
             });
@@ -238,24 +253,24 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         });
     };
 
-    // 4c. A manual check whose window is closed and reopened: the new window gets the results.
+    // 4c. A manual check whose page is hidden and shown again: the page gets the results.
     auto reopen = [=] {
-        DebugCloseResultsWindow();
+        DebugHideUpdatesPage();
         *begun0 = DebugChecksBegun();
-        ShowUpdateResultWindow();
+        ShowUpdatesPage();
         afterSeconds(0.02, [=] {
             bool ownerAttached = true;
-            long ownerRows = DebugResultsWindowRows(&ownerAttached);
-            DebugCloseResultsWindow();
-            ShowUpdateResultWindow();
+            long ownerRows = DebugUpdatesPageRows(&ownerAttached);
+            DebugHideUpdatesPage();
+            ShowUpdatesPage();
             afterSeconds(0.02, [=] {
                 bool attachedWhileRunning = false;
-                long rowsWhileRunning = DebugResultsWindowRows(&attachedWhileRunning);
+                long rowsWhileRunning = DebugUpdatesPageRows(&attachedWhileRunning);
                 bool running = IsUpdateCheckRunning();
                 whenIdle([=] {
                     bool attachedAfter = true;
-                    long rowsAfter = DebugResultsWindowRows(&attachedAfter);
-                    (*state)["reopen"] = {{"first_window_owned_check", ownerRows >= 0 && !ownerAttached}, {"running_when_reopened", running},
+                    long rowsAfter = DebugUpdatesPageRows(&attachedAfter);
+                    (*state)["reopen"] = {{"first_page_owned_check", ownerRows >= 0 && !ownerAttached}, {"running_when_reopened", running},
                                           {"reopened_attached", rowsWhileRunning >= 0 && attachedWhileRunning},
                                           {"rows_after", rowsAfter}, {"attached_after", attachedAfter},
                                           {"begun_delta", DebugChecksBegun() - *begun0}};
@@ -265,28 +280,28 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         });
     };
 
-    // 4b. A window opened while an automatic check runs attaches to it: no second check, results appear when it ends.
+    // 4b. A page shown while an automatic check runs attaches to it: no second check, results appear when it ends.
     auto attach = [=] {
-        DebugCloseResultsWindow();
+        DebugHideUpdatesPage();
         DebugSetAutomaticCheckLastRun((int64_t)time(nullptr) - 3 * 86400);
         *begun0 = DebugChecksBegun();
         bool started = EvaluateAutomaticCheck();
-        ShowUpdateResultWindow();
+        ShowUpdatesPage();
         afterSeconds(0.05, [=] {
             bool attachedWhileRunning = false;
-            long rowsWhileRunning = DebugResultsWindowRows(&attachedWhileRunning);
+            long rowsWhileRunning = DebugUpdatesPageRows(&attachedWhileRunning);
             bool runningThen = IsUpdateCheckRunning();
             // Toggling "Show built in components" must not replace the waiting message.
-            std::string statusBefore = DebugResultsStatus();
+            std::string statusBefore = DebugUpdatesStatus();
             DebugToggleBuiltIn();
-            std::string statusAfter = DebugResultsStatus();
+            std::string statusAfter = DebugUpdatesStatus();
             DebugToggleBuiltIn();
-            bool statusKept = !statusBefore.empty() && statusBefore == statusAfter && DebugResultsStatus() == statusBefore;
+            bool statusKept = !statusBefore.empty() && statusBefore == statusAfter && DebugUpdatesStatus() == statusBefore;
             whenIdle([=] {
                 bool attachedAfter = true;
-                long rowsAfter = DebugResultsWindowRows(&attachedAfter);
-                (*state)["attach"] = {{"status_kept_on_toggle", statusKept}, {"waiting_status", statusBefore},{"auto_started", started}, {"running_when_window_opened", runningThen},
-                                      {"window_open_while_running", rowsWhileRunning >= 0}, {"attached_while_running", attachedWhileRunning},
+                long rowsAfter = DebugUpdatesPageRows(&attachedAfter);
+                (*state)["attach"] = {{"status_kept_on_toggle", statusKept}, {"waiting_status", statusBefore},{"auto_started", started}, {"running_when_page_shown", runningThen},
+                                      {"page_visible_while_running", rowsWhileRunning >= 0}, {"attached_while_running", attachedWhileRunning},
                                       {"rows_after", rowsAfter}, {"attached_after", attachedAfter},
                                       {"begun_delta", DebugChecksBegun() - *begun0}};
                 reopen();
@@ -296,7 +311,7 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
 
     // 3. The periodic timer with the interval elapsed: exactly one more check, ticks keep firing.
     auto periodic = [=] {
-        DebugCloseResultsWindow();
+        DebugHideUpdatesPage();
         SetAutomaticCheckEnabled(true);
         SetAutomaticCheckIntervalDays(1);
         DebugSetAutomaticCheckLastRun((int64_t)time(nullptr) - 3 * 86400);
@@ -306,19 +321,19 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
         afterSeconds(period * 2 + 1.5, [=] {
             whenIdle([=] {
                 (*state)["periodic"] = {{"begun_delta", DebugChecksBegun() - *begun0}, {"ticks_delta", DebugPeriodicTicks() - *ticks0},
-                                        {"window_open", IsResultsWindowOpen()}};
+                                        {"page_visible", IsUpdatesPageVisible()}};
                 attach();
             });
         });
     };
 
-    // 2. Help > Check for Component Updates... with the window already open but idle.
-    auto manualOpenWindow = [=] {
+    // 2. Help > Check for Component Updates... with the page already visible but idle.
+    auto manualPageVisible = [=] {
         *begun0 = DebugChecksBegun();
-        ShowUpdateResultWindow();
+        ShowUpdatesPage();
         afterSeconds(0.5, [=] {
             whenIdle([=] {
-                (*state)["manual_open_window"] = {{"begun_delta", DebugChecksBegun() - *begun0}};
+                (*state)["manual_page_visible"] = {{"begun_delta", DebugChecksBegun() - *begun0}};
                 periodic();
             });
         });
@@ -328,13 +343,13 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
     auto manual = [=] {
         *begun0 = DebugChecksBegun();
         DebugSetAutomaticCheckLastRun(1);
-        ShowUpdateResultWindow();
-        ShowUpdateResultWindow();
+        ShowUpdatesPage();
+        ShowUpdatesPage();
         afterSeconds(0.5, [=] {
             whenIdle([=] {
                 (*state)["manual"] = {{"begun_delta", DebugChecksBegun() - *begun0},
                                       {"last_check_recorded", GetAutomaticCheckLastRun() > (int64_t)time(nullptr) - 120}};
-                manualOpenWindow();
+                manualPageVisible();
             });
         });
     };
@@ -344,7 +359,7 @@ void runTriggerScenario(std::shared_ptr<json> log, std::function<void()> done) {
     postMenuAction("Check For New Versions");
     postMenuAction("Check for new foobar2000 versions");
     afterSeconds(0.5, [=] {
-        (*state)["old_menu_titles"] = {{"begun_delta", DebugChecksBegun() - *begun0}, {"window_open", IsResultsWindowOpen()}};
+        (*state)["old_menu_titles"] = {{"begun_delta", DebugChecksBegun() - *begun0}, {"page_visible", IsUpdatesPageVisible()}};
         manual();
     });
 }
@@ -420,7 +435,7 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             for (char const* bad : {"tampered", "wrongid", "zipslip", "nomac", "notzip", "missing", "linkout", "hiddenentry", "unreadable"}) attempt(bad, pkg(bad));
             *results = RunUpdateCheck(installed, abort);
         } else if (scenario == "self-install") {
-            // What the results window asks for the own row once the check found a newer version.
+            // What the updates page asks for the own row once the check found a newer version.
             (*log)["block_reason"] = fcu::installBlockReason(true, name, "https://example.org/x.fb2k-component", name + ".fb2k-component", false);
             attempt("install", pkg("self"));
             next = "self-restore";
@@ -445,7 +460,7 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             CheckResult const r = rowOf(*results);
             (*log)["row"] = describe(r);
             (*log)["row"]["block_reason"] = fcu::installBlockReason(true, r.dllName, r.downloadUrl, r.assetName, false);
-            // The window before the switch, plus a row that shares its job with another installed component. The
+            // The page before the switch, plus a row that shares its job with another installed component. The
             // worker waits, so the snapshot shows the replaced row and not the staged one.
             dispatch_semaphore_t rendered = dispatch_semaphore_create(0);
             fb2k::inMainThread([=] {
@@ -457,14 +472,14 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
                 overlap.status = UpdateStatus::UpToDate;
                 overlap.overlap = "Same job as foo_jl_scrobble (Last.fm scrobbler). Keep only one.";
                 shown.push_back(overlap);
-                (*log)["snapshot_rows"] = DebugSnapshotResultsWindow(shown, false, "/tmp/fcu-ui/results-switch.png");
+                (*log)["snapshot_rows"] = DebugSnapshotUpdatesPage(shown, false, "/tmp/fcu-ui/results-switch.png");
                 (*log)["switch_confirmation"] = DebugSnapshotSwitchConfirmation(*results, "/tmp/fcu-ui/switch-confirmation.png");
                 dispatch_semaphore_signal(rendered);
             });
             dispatch_semaphore_wait(rendered, DISPATCH_TIME_FOREVER);
             fcu::InstallOutcome o = fcu::switchComponent("foo_abx", r.replacedBy, r.downloadUrl, r.replacementTeam, abort);
             (*log)["outcomes"]["switch"] = {{"ok", o.ok}, {"message", o.message}};
-            // As the results window does once the switch is staged.
+            // As the updates page does once the switch is staged.
             if (o.ok && !r.migration.empty()) RememberMigrationNote({"foo_abx", r.replacedBy, r.migration});
             next = "switch-after";
         } else if (scenario == "core") {
@@ -487,7 +502,7 @@ void runInstallScenario(std::string const& path, std::string const& scenario) {
             dispatch_semaphore_wait(rendered, DISPATCH_TIME_FOREVER);
             fcu::InstallOutcome o = fcu::stageRemoval("foo_abx", abort);
             (*log)["outcomes"]["stage_removal"] = {{"ok", o.ok}, {"message", o.message}};
-            // As the results window does once the removal is staged.
+            // As the updates page does once the removal is staged.
             if (o.ok && !r.migration.empty()) RememberMigrationNote({"foo_abx", r.replacedBy, r.migration});
             next = "core-after";
         }
@@ -540,7 +555,7 @@ public:
             return;
         }
 
-        DebugSetResultsWindowOffscreen(true);
+        DebugSetUpdatesPageOffscreen(true);
         auto log = std::make_shared<json>();
         (*log)["version"] = FCU_VERSION;
         (*log)["registered"] = registrations();
@@ -582,11 +597,11 @@ public:
                 bool savedShowBuiltIn = GetShowBuiltInComponents();
                 size_t visible = 0, visibleShown = 0;
                 SetShowBuiltInComponents(false);
-                size_t cells = DebugRealiseResultsWindow(results, &visible);
+                size_t cells = DebugRealiseUpdatesTable(results, &visible);
                 SetShowBuiltInComponents(true);
-                size_t cellsShown = DebugRealiseResultsWindow(results, &visibleShown);
+                size_t cellsShown = DebugRealiseUpdatesTable(results, &visibleShown);
                 SetShowBuiltInComponents(savedShowBuiltIn);
-                (*log)["results_window"] = {{"rows", results.size()}, {"visible_rows", visible}, {"cells", cells},
+                (*log)["results_table"] = {{"rows", results.size()}, {"visible_rows", visible}, {"cells", cells},
                     {"visible_rows_shown", visibleShown}, {"cells_shown", cellsShown},
                     {"built_in_rows", std::count_if(results.begin(), results.end(), [](CheckResult const& r) { return r.dllName == "Core"; })}};
                 (*log)["snapshots"] = snapshots(results);

@@ -31,7 +31,7 @@ Rules:
 * `source` is one of `github`, `gitlab`, `codeberg`, `marc2k3`, `sourceforge`, `hyv`.
 * `github`, `gitlab` and `codeberg` take `owner` and `repo`, both matching `[A-Za-z0-9._-]+`. The other three take `url`, which must start with `https://`.
 * No other keys are allowed, and `dll` is not used: the component name is already known.
-* An invalid value is ignored, the next source is tried, and the results window says "Invalid FB2KUpdateSource" in the row tooltip.
+* An invalid value is ignored, the next source is tried, and the Status tooltip on the Component Updates page says "Invalid FB2KUpdateSource".
 * The key only affects the bundle that contains it. It takes effect from the first release that includes it, so older installed versions are found through the registry.
 
 ## Or publish in the official catalog
@@ -71,7 +71,7 @@ Rules:
 * `migration_url` is optional: an `https://` page (printable ASCII, no user name before the host) that tells users what to set up again, such as logging in once more. The confirmation shows it as a link, and after the restart that completes the switch foobar2000 offers it once. It opens only when the user clicks it.
 * `team` is optional: the successor's Team ID (10 capital letters or digits). If your component is signed with a Developer ID, the successor must be signed by the same team unless `team` names another one. Ad hoc signed components have nothing to pin.
 * No other keys are allowed. It is a separate key on purpose: `FB2KUpdateSource` accepts no other keys, and older versions of the updater would drop the whole update source.
-* Once a user has that release, the results window shows the row as "Replaced" with the successor's version. Ticking it and clicking Install downloads the successor (same package rules as above, a valid signature and a bundle identifier) and removes your component at the next start of foobar2000. Users can keep yours instead (right click > Keep).
+* Once a user has that release, the Component Updates page shows the row as "Replaced" with the successor's version. Ticking it and clicking Install downloads the successor (same package rules as above, a valid signature and a bundle identifier) and removes your component at the next start of foobar2000. Users can keep yours instead (right click > Keep).
 * Settings are not carried over; the successor has its own.
 * An invalid key is ignored and the row tooltip says "Invalid FB2KReplacedBy".
 
@@ -92,6 +92,6 @@ If a foobar2000 release now includes what your component did, declare the versio
 * Declare exactly one of `component` and `foobar2000`. With `foobar2000`, `source`, `owner`, `repo`, `url` and `team` are not allowed: there is nothing to download.
 * `foobar2000` is the first foobar2000 version that includes the feature, in a form such as `2.27`. Anything else is an invalid key.
 * `migration_url` is optional and works as above.
-* When the running foobar2000 is that version or newer, the results window shows the row as "Replaced by foobar2000 2.27". Ticking it and clicking Install only removes your component at the next start of foobar2000; nothing is downloaded. Users can keep yours instead (right click > Keep).
+* When the running foobar2000 is that version or newer, the Component Updates page shows the row as "Replaced by foobar2000 2.27". Ticking it and clicking Install only removes your component at the next start of foobar2000; nothing is downloaded. Users can keep yours instead (right click > Keep).
 * With an older foobar2000 the row is checked as usual and its note says that foobar2000 2.27 includes it and that it can be removed after updating foobar2000. It does not count as "Replaced" then.
 * The updater's built in list accepts the same in `"replaced_by"`: `{"foobar2000": "2.27"}`.

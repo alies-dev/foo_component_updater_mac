@@ -5,15 +5,9 @@ foobar2000 for Mac checks only itself for updates; this component checks the com
 [Component topic on hydrogenaudio](https://hydrogenaudio.org/index.php/topic,130098.0.html).
 
 <p align="center">
-  <img src="docs/images/results-window.png" alt="The results window listing installed components with installed version, latest version, release date and status" width="720">
+  <img src="docs/images/updates-page.png" alt="Preferences > Tools > Component Updates: schedule settings above a list of installed components with name, version, module and status" width="720">
   <br>
-  <em>Help > Check for Component Updates...: every installed component with its installed and latest version and the release date.</em>
-</p>
-
-<p align="center">
-  <img src="docs/images/preferences.png" alt="The Component Updates preferences page under Tools" width="480">
-  <br>
-  <em>Preferences > Tools > Component Updates: schedule and prereleases.</em>
+  <em>Preferences > Tools > Component Updates (Help > Check for Component Updates... opens it and checks): every installed component with its version, module and status, like foobar2000's Components page.</em>
 </p>
 
 ## Install
@@ -26,13 +20,13 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 
 ## Features
 
-* A results window with the installed and the latest version of each component, its status and a link to the release notes.
+* The update list is on Preferences > Tools > Component Updates, laid out like foobar2000's Components page: Name, Version, Module and Status for each component, with a tick box per row. Help > Check for Component Updates... opens the page and checks. Hover the status for the release date, source and notes, double click a row to open its release page.
 * Installs the updates you tick: select the rows, click Install, then restart foobar2000. The version it replaces is kept, and right click > Restore Previous brings it back. The updater's own row works the same way.
 * Shows "Replaced" when a component names its successor, and switches to it when you tick the row: the successor is installed and the old component removed at the next start. Migration notes the author links to are offered with one click, before the switch and once after it. Right click > Keep stays with the old one. When a component says foobar2000 itself now includes its feature and you run that version, the row is "Replaced" too and Install only removes the component.
 * Warns when two installed components do the same job (Last.fm scrobblers so far): each would do the work twice.
 * Finds updates on GitHub (including repositories with several components), in the foobar2000.org catalog and in the shared component registry. Authors can declare their source with an `FB2KUpdateSource` key.
 * Checks automatically every few days.
-* foobar2000's built in components are hidden unless you ask for them.
+* foobar2000's built in components are hidden in the list unless you tick "Show built in components".
 
 ## Privacy and safety
 
@@ -44,7 +38,7 @@ Requires macOS 12 or newer, Apple Silicon or Intel.
 
 ## If an update breaks the updater itself
 
-Restore Previous is in this component's own window, so it cannot help when the new version does not load. The version it replaced is kept in `~/Library/foobar2000-v2/foo_component_updater_mac/backup/foo_component_updater_mac/`. Either install the older `.fb2k-component` from the Releases page through Settings... > Components > `+`, or put the kept copy back and start foobar2000:
+Restore Previous is on this component's own preferences page, so it cannot help when the new version does not load. The version it replaced is kept in `~/Library/foobar2000-v2/foo_component_updater_mac/backup/foo_component_updater_mac/`. Either install the older `.fb2k-component` from the Releases page through Settings... > Components > `+`, or put the kept copy back and start foobar2000:
 
 ```
 cd ~/Library/foobar2000-v2

@@ -10,7 +10,7 @@
 #include "ComponentIds.h"
 #include "../upstream/update_check.h"
 #import "../UI/PreferencesController.h"
-#include "../UI/ResultsWindow.h"
+#include "../UI/UpdatesPage.h"
 
 DECLARE_COMPONENT_VERSION(
     "Component Updater",
@@ -45,7 +45,7 @@ public:
     GUID get_parent() override { return mainmenu_groups::help; }
 
     void execute(t_uint32, service_ptr_t<service_base>) override {
-        ShowUpdateResultWindow();
+        ShowUpdatesPage();
     }
 };
 

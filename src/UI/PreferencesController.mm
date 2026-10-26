@@ -5,22 +5,22 @@
 #include "../Integration/Settings.h"
 #include "../upstream/automatic_check.h"
 #include "../upstream/update_check.h"
-#include "ResultsWindow.h"
+#include "UpdatesPage.h"
 
 namespace {
 
-const CGFloat kPageWidth = 480;
 const CGFloat kMargin = 20;
-const CGFloat kContentWidth = kPageWidth - 2 * kMargin;
+const CGFloat kContentWidth = 440; // the settings block; the table below it takes the rest of the page
+const CGFloat kGap = 16;
 const CGFloat kIndent = 18;
 
-NSString *const kSummary = @"Finds newer versions of components you added, which foobar2000\u2019s own update check does not cover, and installs the ones you choose.";
+NSString *const kSummary = @"Finds newer versions of components you added, which foobar2000\u2019s own update check does not cover, and installs the ones you choose. The results are listed below.";
 
 NSArray<NSArray<NSString *> *> *helpRows() {
     return @[
-        @[@"Purpose", @"Reports newer versions of the components you added to foobar2000 and lists them in a window. Nothing is installed until you tick an update there and click Install; the replaced version is kept for Restore Previous and the change applies after a restart."],
+        @[@"Purpose", @"Reports newer versions of the components you added to foobar2000 and lists them on this page. Nothing is installed until you tick an update in the list and click Install; the replaced version is kept for Restore Previous and the change applies after a restart."],
         @[@"Why", @"foobar2000\u2019s Check For New Versions covers foobar2000 only, not components you added. Built in components update with foobar2000 and are not checked here."],
-        @[@"Schedule", @"Shortly after foobar2000 starts, then every 6 hours while it is open, once the last check is at least the chosen number of days old. A window opens only when an update is found."],
+        @[@"Schedule", @"Shortly after foobar2000 starts, then every 6 hours while it is open, once the last check is at least the chosen number of days old. This page opens only when an update is found."],
         @[@"Manual", @"Check Now, or Help > Check for Component Updates..."],
         @[@"Needed if", @"You added components and want to know when they have newer versions."],
         @[@"Not needed if", @"You added none, or you prefer to check yourself. Turn off automatic checks, or remove this component in Preferences > Components."],
@@ -93,12 +93,17 @@ NSButton *makeHelpButton(id target, SEL action, NSString *tooltip, NSString *acc
 
 } // namespace
 
-// Opens (or closes) the help popover below `anchor`. Free function so another window can reuse it.
+// Opens (or closes) the help popover below `anchor`. Free function so another view can reuse it.
 void FCUShowHelpPopover(NSView *anchor) {
     togglePopover(anchor, ^{ return makeInfoView(helpRows()); }, &g_helpPopover);
 }
 
 NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
+
+#ifdef FCU_DEBUG_HOOKS
+// The controller whose view is on screen (weak: foobar2000 owns the controllers).
+static __weak FCUPreferencesController *g_shownPage = nil;
+#endif
 
 @interface FCUFlippedView : NSView
 @end
@@ -111,6 +116,7 @@ NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
 
 @implementation FCUPreferencesController {
     NSStackView *_page;
+    FCUUpdatesView *_updates;
     NSButton *_autoCheck, *_prereleases;
     NSStepper *_stepper;
     NSTextField *_interval, *_days, *_lastCheck;
@@ -120,10 +126,12 @@ NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
 - (NSString *)preferencesTitle { return @"Component Updates"; }
 
 - (void)loadView {
-    self.view = [[FCUFlippedView alloc] initWithFrame:NSMakeRect(0, 0, kPageWidth, 300)];
+    // foobar2000 sizes the page; the settings block stays at the top left and the table takes the rest.
+    self.view = [[FCUFlippedView alloc] initWithFrame:NSMakeRect(0, 0, 720, 560)];
+    self.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [self buildUI];
     [self loadSettings];
-    [self sizeViewOnce];
+    [self.view layoutSubtreeIfNeeded];
 }
 
 - (void)viewWillAppear {
@@ -134,9 +142,21 @@ NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
                                                  name:FCUUpdateCheckCompletedNotification object:nil];
 }
 
+- (void)viewDidAppear {
+    [super viewDidAppear];
+#ifdef FCU_DEBUG_HOOKS
+    g_shownPage = self;
+#endif
+    UpdatesPageVisibilityChanged(true);
+}
+
 - (void)viewDidDisappear {
     [super viewDidDisappear];
+#ifdef FCU_DEBUG_HOOKS
+    if (g_shownPage == self) g_shownPage = nil;
+#endif
     [[NSNotificationCenter defaultCenter] removeObserver:self name:FCUUpdateCheckCompletedNotification object:nil];
+    UpdatesPageVisibilityChanged(false);
 }
 
 #pragma mark - Building blocks
@@ -174,7 +194,7 @@ NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
 
     // Automatic check row: toggle and interval on the left, Check Now on the right.
     _autoCheck = [NSButton checkboxWithTitle:@"Check automatically every" target:self action:@selector(autoCheckChanged:)];
-    _autoCheck.toolTip = @"Runs shortly after foobar2000 starts and every 6 hours while it is open, once enough days have passed since the last check. A window opens only when an update is found.";
+    _autoCheck.toolTip = @"Runs shortly after foobar2000 starts and every 6 hours while it is open, once enough days have passed since the last check. This page opens only when an update is found.";
 
     // No number formatter: the text is read by fcu::parseIntervalInput when editing ends
     // (clamped to 1 to 30, or reverted when it is not a number), never by a formatter alert.
@@ -226,24 +246,26 @@ NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
     _page.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_page];
 
+    _updates = [[FCUUpdatesView alloc] initWithFrame:NSZeroRect];
+    _updates.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:_updates];
+
     NSButton *help = makeHelpButton(self, @selector(showHelp:), @"About Component Updates", @"About Component Updates");
     [self.view addSubview:help];
+    NSLayoutConstraint *minHeight = [_updates.heightAnchor constraintGreaterThanOrEqualToConstant:160];
+    minHeight.priority = 750; // a very short pane squeezes the table rather than breaking the layout
     [NSLayoutConstraint activateConstraints:@[
         [_page.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:kMargin],
         [_page.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:kMargin],
         [_page.widthAnchor constraintEqualToConstant:kContentWidth],
+        [_updates.topAnchor constraintEqualToAnchor:_page.bottomAnchor constant:kGap],
+        [_updates.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:kMargin],
+        [_updates.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-kMargin],
+        [_updates.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:-kMargin],
+        minHeight,
         [help.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-kMargin],
         [help.centerYAnchor constraintEqualToAnchor:title.centerYAnchor],
     ]];
-}
-
-// One fixed frame for the page, set once and pinned to the top of this flipped view.
-// Never ask the host to resize its window (no preferred content size).
-- (void)sizeViewOnce {
-    [self.view layoutSubtreeIfNeeded];
-    CGFloat height = _page.fittingSize.height + 2 * kMargin;
-    [self.view setFrameSize:NSMakeSize(kPageWidth, height)];
-    [self.view layoutSubtreeIfNeeded];
 }
 
 - (void)showHelp:(NSButton *)sender { FCUShowHelpPopover(sender); }
@@ -255,7 +277,38 @@ NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
             self.view.frame.size.width, self.view.frame.size.height];
 }
 
+- (NSView *)debugUpdatesView { return _updates; }
+
 - (NSString *)debugLastCheckText { return _lastCheck.stringValue; }
+
+- (NSString *)debugShownGeometry {
+    NSView *page = self.view;
+    NSSize super_ = page.superview.frame.size;
+    NSSize updates = _updates.frame.size;
+    return [NSString stringWithFormat:@"page %.0fx%.0f in superview %.0fx%.0f, updates %.0fx%.0f", page.frame.size.width,
+            page.frame.size.height, super_.width, super_.height, updates.width, updates.height];
+}
+
+- (NSString *)debugShownGeometryNumbers {
+    NSSize page = self.view.frame.size;
+    NSSize super_ = self.view.superview.frame.size;
+    return [NSString stringWithFormat:@"%.2f %.2f %.2f %.2f %.2f", page.width, page.height, super_.width, super_.height,
+            _updates.frame.size.height];
+}
+
+- (void)debugClosePreferencesWindow { [self.view.window performClose:nil]; }
+
+NSString *FCUDebugShownPreferencesGeometry(void) {
+    FCUPreferencesController *shown = g_shownPage;
+    return shown ? [shown debugShownGeometry] : @"";
+}
+
+NSString *FCUDebugShownPreferencesNumbers(void) {
+    FCUPreferencesController *shown = g_shownPage;
+    return shown ? [shown debugShownGeometryNumbers] : @"";
+}
+
+void FCUDebugClosePreferencesWindow(void) { [g_shownPage debugClosePreferencesWindow]; }
 #endif
 
 #pragma mark - Settings
@@ -365,7 +418,7 @@ NSView *FCUMakeHelpContentView(void) { return makeInfoView(helpRows()); }
 }
 
 - (void)checkNow:(id)sender {
-    ShowUpdateResultWindow();
+    ShowUpdatesPage();
 }
 
 @end
