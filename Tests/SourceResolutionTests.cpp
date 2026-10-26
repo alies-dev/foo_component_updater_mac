@@ -123,7 +123,7 @@ int main() {
         extra = fixture("../../Resources/extra_components.json");
     }
     std::vector<RepositoryMappingEntry> builtIn;
-    CHECK(parseRegistryJson(extra, builtIn) && builtIn.size() == 16, "11 foo_jl entries and 5 others");
+    CHECK(parseRegistryJson(extra, builtIn) && builtIn.size() == 18, "11 foo_jl entries and 7 others");
     size_t jenda = 0;
     for (auto const& e : builtIn) {
         bool isJl = e.dllName.rfind("foo_jl_", 0) == 0;
@@ -134,7 +134,8 @@ int main() {
     struct Extra { char const* dll; char const* owner; char const* repo; } extras[] = {
         {"foo_mac_scrobble", "avelytchko", "foo_mac_scrobble"}, {"foo_vis_projectm_mac", "Stwarf", "foo_vis_projectm_mac"},
         {"foo_cyan_leaf", "CyanLeafcomponent", "cyan-leaf-downloads"}, {"foo_vis_projectMacOS", "gabitoesmiapodo", "projectMacOS"},
-        {"foo_richtext_mac", "seongbin", "foo_richtext_mac"},
+        {"foo_richtext_mac", "seongbin", "foo_richtext_mac"}, {"foo_dms_browser", "sunick2009", "foo_upnp_mac"},
+        {"foo_lastfm", "Scannou", "foo-lastfm"},
     };
     for (auto const& x : extras) {
         RepositoryMappingEntry found;

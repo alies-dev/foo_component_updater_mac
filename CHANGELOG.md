@@ -2,6 +2,12 @@
 
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+* Update checks for foo_dms_browser (UPnP) and foo_lastfm.
+
 ## [0.2.2] - 2026-10-23
 
 ### Fixed
