@@ -14,7 +14,7 @@
 #   down       stub not listening: network errors, no crash
 #   ratelimit  stub answers 403 with x-ratelimit headers: message, no further API calls
 #   badregistry registry entries that must never reach a URL
-#   triggers   Help > Check for Component Updates... and the periodic evaluation (counted checks), and that foobar2000's own update menu titles start none
+#   triggers   Help > Check for Third-Party Component Updates... and the periodic evaluation (counted checks), and that foobar2000's own update menu titles start none
 #
 # M2 runs the install scenarios in the real foobar2000 (the chains are linked by main_restart() calls of the component itself):
 #   m2-install   the check finds the older foo_abx, the install stages the catalog package, the process restarts
@@ -73,6 +73,17 @@ fence() { { echo '```'; cat; echo '```'; } >> "$PROOF"; }
 fail() { say "FAIL $*"; FAILURES=$((FAILURES + 1)); }
 
 fb2k_pid() { pgrep -x foobar2000 | head -1; }
+
+# Starts foobar2000 in the background and sets BATCH_PID. Right after a quit LaunchServices can still hold the old
+# instance and drop the open (error -600, no process), so the open is repeated until a process appears.
+launch_fb2k() {
+    BATCH_PID=""
+    for _ in 1 2 3; do
+        open -g -a foobar2000 2>/dev/null
+        for _ in $(seq 1 40); do BATCH_PID="$(fb2k_pid)"; [ -n "$BATCH_PID" ] && return 0; sleep 0.25; done
+    done
+    return 1
+}
 
 # Quits only the foobar2000 this batch started. Any other instance (the owner may be
 # listening to music) is never quit: this returns 1 and the caller stops.
@@ -169,8 +180,7 @@ start_run() {
         exit 3
     fi
     cfg_set_string foo_component_updater_mac.debug.autotest "$log"
-    open -g -a foobar2000
-    for _ in $(seq 1 40); do BATCH_PID="$(fb2k_pid)"; [ -n "$BATCH_PID" ] && break; sleep 0.25; done
+    launch_fb2k
     for _ in $(seq 1 240); do
         [ -s "$log" ] && break
         sleep 0.5
@@ -430,8 +440,7 @@ m2_start() {
     [ -z "$(fb2k_pid)" ] || { fail "m2 $1: foobar2000 is already running and was not started by this batch; it is left alone"; exit 3; }
     cfg_set_string foo_component_updater_mac.debug.m2 "$1"
     cfg_set_string foo_component_updater_mac.debug.autotest "$WORK/autotest-m2-$1.json"
-    open -g -a foobar2000
-    for _ in $(seq 1 40); do BATCH_PID="$(fb2k_pid)"; [ -n "$BATCH_PID" ] && break; sleep 0.25; done
+    launch_fb2k
     m2_wait "$1"
 }
 

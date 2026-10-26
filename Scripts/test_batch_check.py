@@ -33,19 +33,23 @@ def stub_paths(stub_log):
 def common(log):
     reg = log["registered"]
     check("menu command registered in Help",
-          len(reg["menu"]) == 1 and reg["menu"][0]["name"] == "Check for Component Updates..." and reg["menu"][0]["in_help_menu"], reg["menu"])
+          len(reg["menu"]) == 1 and reg["menu"][0]["name"] == "Check for Third-Party Component Updates..." and reg["menu"][0]["in_help_menu"], reg["menu"])
     check("preferences page registered under Tools",
           len(reg["preferences"]) == 1 and reg["preferences"][0]["name"] == "Component Updates" and reg["preferences"][0]["under_tools"], reg["preferences"])
     for r in log["rows"]:
         if r["component"] == "Core":
             check("Core row is No source", r["status"] == "no_source", r)
             break
-    rw = log["results_window"]
-    check("results window with built in components hidden builds every visible cell off screen",
+    rw = log["results_table"]
+    check("updates table with built in components hidden builds every visible cell off screen (5 per row)",
           rw["rows"] == len(log["rows"]) and rw["visible_rows"] == rw["rows"] - rw["built_in_rows"] and rw["built_in_rows"] > 0
-          and rw["cells"] == 7 * rw["visible_rows"], rw)
-    check("results window with built in components shown lists every row (measured separately from the saved preference)",
-          rw["visible_rows_shown"] == rw["rows"] and rw["cells_shown"] == 7 * rw["rows"], rw)
+          and rw["cells"] == 5 * rw["visible_rows"], rw)
+    check("updates table with built in components shown lists every row (measured separately from the saved preference)",
+          rw["visible_rows_shown"] == rw["rows"] and rw["cells_shown"] == 5 * rw["rows"], rw)
+    rb = log["rows_before_check"]
+    check("before any check the page lists the installed components from local data (built in only when shown)",
+          rb["hidden"] == len([r for r in log["rows"] if r["component"] not in ("", "Core")])
+          and rb["shown"] == len([r for r in log["rows"] if r["component"]]), rb)
     iv = log["apply"]["interval"]
     check("interval field commits on end editing: 12 saved, 0 clamps to 1, 31 clamps to 30, empty and text revert, typed text survives a stepper click",
           iv["type_12"] == 12 and iv["type_0"] == 1 and iv["type_31"] == 30 and iv["type_12_again"] == 12
@@ -81,7 +85,7 @@ def jenda_rows(rows):
 
 # GitHub release list requests (/repos/.../releases) each run must make: 2 checks' worth is a bug.
 # The checked component and JendaT's suite are one request each; triggers also counts the 7 later
-# checks (the command twice, the command with the window open, periodic, attach, manual reopen, dismiss, concurrent) of the scenario.
+# checks (the command twice, the command with the page visible, periodic, attach, manual reopen, dismiss, concurrent) of the scenario.
 EXPECTED_GITHUB_REQUESTS = {"real": 2, "stub": 2, "down": 2, "ratelimit": 1, "badregistry": 2, "triggers": 16}
 
 
@@ -172,7 +176,7 @@ def m2(run, log, previous_pid):
               (before["installed_version"], before["staged"], before["removal_staged"], ng["installed_version"], ng["staged"]) == ("2.2.3", False, False, "", False), log)
         check("the switch staged foo_abx_ng and the removal of foo_abx",
               o["switch"]["ok"] is True and after["removal_staged"] is True and log["replacement_after"]["staged"] is True, log)
-        check("the results window rendered the switch rows", log["snapshot_rows"] > 0, log["snapshot_rows"])
+        check("the updates page rendered the switch rows", log["snapshot_rows"] > 0, log["snapshot_rows"])
         expected = ("Switch foo_abx to foo_abx_ng?\nfoo_abx 2.2.3 will be removed.\nfoo_abx_ng 1.0.0 will be installed.\nFrom: fcu-test/foo_abx_ng\n"
                     "Declared by foo_abx itself.\n\nSettings are not carried over. The changes apply when foobar2000 restarts.\n"
                     "[link] Migration notes for foo_abx_ng (github.com) -> https://github.com/fcu-test/foo_abx_ng#migrating")
@@ -281,33 +285,39 @@ def main():
         check("valid components in the same run are unaffected", rows.get("foo_jl_spectrum", {}).get("status") == "update_available", rows.get("foo_jl_spectrum"))
     elif run == "triggers":
         t = log.get("triggers", {})
-        check("foobar2000's own update menu titles (app and Help menu) start no check and open no window",
-              t.get("old_menu_titles") == {"begun_delta": 0, "window_open": False}, t.get("old_menu_titles"))
-        check("Help > Check for Component Updates... twice in a row: 1 check begun, its completion is recorded as the last check",
+        check("foobar2000's own update menu titles (app and Help menu) start no check and show no updates page",
+              t.get("old_menu_titles") == {"begun_delta": 0, "page_visible": False}, t.get("old_menu_titles"))
+        check("Help > Check for Third-Party Component Updates... twice in a row: 1 check begun, its completion is recorded as the last check",
               t.get("manual", {}).get("begun_delta") == 1 and t.get("manual", {}).get("last_check_recorded") is True, t.get("manual"))
-        check("the command with the window already open starts exactly 1 check", t.get("manual_open_window") == {"begun_delta": 1}, t.get("manual_open_window"))
+        check("the command with the page already visible starts exactly 1 check", t.get("manual_page_visible") == {"begun_delta": 1}, t.get("manual_page_visible"))
         p = t.get("periodic", {})
         check("periodic evaluation with the interval elapsed starts exactly 1 more check while the timer keeps firing",
               p.get("begun_delta") == 1 and p.get("ticks_delta", 0) >= 2, p)
-        check("the automatic check opened the results window (update found)", p.get("window_open") is True, p)
+        check("the automatic check showed the updates page (update found)", p.get("page_visible") is True, p)
         a = t.get("attach", {})
         check("toggling Show built in components while waiting keeps the waiting status",
               a.get("status_kept_on_toggle") is True and "already running" in a.get("waiting_status", ""), a)
-        check("a window opened while an automatic check runs attaches to it: no second check, results shown when it ends",
-              a.get("auto_started") is True and a.get("running_when_window_opened") is True and a.get("attached_while_running") is True
+        check("a page shown while an automatic check runs attaches to it: no second check, results shown when it ends",
+              a.get("auto_started") is True and a.get("running_when_page_shown") is True and a.get("attached_while_running") is True
               and a.get("begun_delta") == 1 and a.get("attached_after") is False and a.get("rows_after", 0) > 0, a)
         r = t.get("reopen", {})
-        check("manual check: window closed and reopened while it runs, the reopened window attaches and receives the results, no second check",
-              r.get("first_window_owned_check") is True and r.get("running_when_reopened") is True and r.get("reopened_attached") is True
+        check("manual check: page hidden and shown again while it runs, the shown page attaches and receives the results, no second check",
+              r.get("first_page_owned_check") is True and r.get("running_when_reopened") is True and r.get("reopened_attached") is True
               and r.get("begun_delta") == 1 and r.get("attached_after") is False and r.get("rows_after", 0) > 0, r)
         d = t.get("dismiss", {})
-        check("automatic check: window attached then closed, the completion does not open a window again although updates were found",
-              d.get("auto_started") is True and d.get("window_attached_before_close") is True and d.get("running_after_close") is True
+        check("automatic check: page attached then hidden, the completion does not show the page again although updates were found",
+              d.get("auto_started") is True and d.get("page_attached_before_hide") is True and d.get("running_after_hide") is True
               and d.get("reopened_attached_to_same_check") is True
-              and d.get("window_open_after_completion") is False and d.get("begun_delta") == 1, d)
+              and d.get("page_visible_after_completion") is False and d.get("begun_delta") == 1, d)
         c = t.get("concurrent", {})
         check("two back to back evaluations start 1 check, the second is refused while it runs",
               c.get("first_started") is True and c.get("second_started") is False and c.get("begun_delta") == 1 and c.get("running_after") is True, c)
+        g = t.get("host_geometry_numbers", {})
+        print(f"INFO host geometry in the real Preferences window: {t.get('host_geometry')!r}")
+        check("the real Preferences window shows our page and foobar2000 sizes it to its pane", bool(t.get("host_geometry")) and g.get("super_w", -1) > 0, t.get("host_geometry"))
+        check("the page fills its superview (within 1 pt)",
+              abs(g.get("page_w", -1) - g.get("super_w", -2)) <= 1 and abs(g.get("page_h", -1) - g.get("super_h", -2)) <= 1, t.get("host_geometry"))
+        check("the updates table area is at least 200 pt tall", g.get("updates_h", 0) >= 200, t.get("host_geometry"))
     sys.exit(1 if failures else 0)
 
 

@@ -1,7 +1,7 @@
 #include "../fb2k_sdk.h"
 #include "update_check.h"
 #include "automatic_check.h"
-#include "../UI/ResultsWindow.h"
+#include "../UI/UpdatesPage.h"
 #include "../version.h"
 #include "../Core/triggers.h"
 
@@ -124,8 +124,8 @@ bool EvaluateAutomaticCheck() {
     // アプリ終了処理の途中でこのコールバックが呼ばれた場合、何もせず打ち切る。
     if (fb2k::mainAborter().is_aborting()) return false;
     if (!shouldRunAutomaticCheckNow()) return false;
-    // 確認が実行中、または結果ウィンドウが開いている間は始めない。次の評価に委ねる。
-    if (IsResultsWindowOpen() || !TryBeginUpdateCheck()) return false;
+    // 確認が実行中、または設定ページ(結果の一覧)が表示されている間は始めない。次の評価に委ねる。
+    if (IsUpdatesPageVisible() || !TryBeginUpdateCheck()) return false;
 
     // 確認を試みた時点で最終確認日時を更新する(Bounded Work: 通信不調時に再試行が
     // 集中するのを防ぐ)。以前は確認の完了後に更新していた。
@@ -147,11 +147,11 @@ bool EvaluateAutomaticCheck() {
             (level == AutoCheckNotificationLevel::UpdatesAndErrors && HasAnyError(results));
 
         // Non-Intrusive(既定): 通知レベルに応じて必要な場合のみ
-        // ポップアップウィンドウで知らせる。
-        // 実行中に開かれた結果ウィンドウは、この確認の結果を受け取る。
+        // 設定ページ(結果の一覧)を開いて知らせる。
+        // 実行中にこのページを開いた場合は、この確認の結果がそこに表示される。
         fb2k::inMainThread([results, shouldShow, checkId] {
             // アプリ終了処理の途中でこのコールバックが呼ばれた場合、
-            // 新しくウィンドウを作らずに打ち切る(main_thread_callback経由の
+            // 新しくページを開かずに打ち切る(main_thread_callback経由の
             // 処理が終了中にディスパッチされることによる不具合を避ける)。
             if (fb2k::mainAborter().is_aborting()) { EndUpdateCheck(); return; }
 

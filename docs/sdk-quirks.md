@@ -81,14 +81,14 @@ All files:
 
 `automatic_check.cpp`:
 
-* `result_window.h` becomes `../UI/ResultsWindow.h`.
+* `result_window.h` becomes `../UI/UpdatesPage.h`.
 * `Sleep(k_startupDelaySeconds * 1000)` becomes an abortable `fb2k::mainAborter().sleep_ex(k_startupDelaySeconds)`.
-* The window call drops the `HWND` argument.
+* The page call drops the `HWND` argument.
 * `fb2k::inCpuWorkerThread` becomes `fb2k::splitTask` for the startup delay and for the check, so the long network work does not occupy the shared CPU worker pool. Abort checks and the main thread enumeration are kept.
-* The result window call is `DeliverCheckResults(checkId, results, message, openIfClosed)`, called for every automatic check. Manual and automatic checks share one delivery path keyed by `CurrentUpdateCheckId()`: the window attached to that check receives the results, a window closed during an automatic check does not get recreated by it, and the notification level only decides whether a closed window opens.
+* The delivery call is `DeliverCheckResults(checkId, results, message, openIfClosed)`, called for every automatic check. Manual and automatic checks share one delivery path keyed by `CurrentUpdateCheckId()`: the page attached to that check receives the results, a page left during an automatic check is not shown again by it, and the notification level only decides whether a page that is not visible opens.
 * The check lambda has a `try` / `catch (std::exception const&)` so nothing escapes into foobar2000.
-* The due test is `fcu::isAutomaticCheckDue` (pure, unit tested) and the check body is `EvaluateAutomaticCheck()`, called on the main thread by the startup delay and by the 6 hour timer in `Integration/PeriodicCheck.mm`. It refuses to start while a check runs (`TryBeginUpdateCheck`) or the results window is open, and writes the last run time when the check starts instead of when it ends.
-* Upstream records the last run only for automatic checks. Here every completed check (manual from the Help menu or the window, automatic) records it through `MarkCheckCompletedNow()`, and the interval of the automatic check counts from it. The automatic check still also writes it when it starts.
+* The due test is `fcu::isAutomaticCheckDue` (pure, unit tested) and the check body is `EvaluateAutomaticCheck()`, called on the main thread by the startup delay and by the 6 hour timer in `Integration/PeriodicCheck.mm`. It refuses to start while a check runs (`TryBeginUpdateCheck`) or the Component Updates page is visible, and writes the last run time when the check starts instead of when it ends.
+* Upstream records the last run only for automatic checks. Here every completed check (manual from the Help menu or the preferences page, automatic) records it through `MarkCheckCompletedNow()`, and the interval of the automatic check counts from it. The automatic check still also writes it when it starts.
 * `automatic_check.h` and `.cpp` gain `GetAutomaticCheckLastRun()`, a read only accessor for the persisted last run time (shown on the preferences page).
 * Debug builds only: `on_init` schedules nothing while the autotest config key is set (the saved preference is not touched).
 

@@ -146,7 +146,7 @@ void AddNote(CheckResult& r, std::string const& text) {
 // A replacement row shows the release of the replacement; only a failed lookup stays an error.
 void FinishReplacement(CheckResult& r) {
     if (r.status == UpdateStatus::Error) {
-        // The error stays first: the window recognizes a rate limit by how the message starts.
+        // The error stays first: the Component Updates page recognizes a rate limit by how the message starts.
         r.errorMessage += " (while checking " + r.replacedBy + ", which replaces this component)";
         return;
     }
@@ -506,7 +506,7 @@ void RunChecks(
 
 } // namespace
 
-// Entry point of every worker (window, automatic check, autotest): nothing may
+// Entry point of every worker (Component Updates page, automatic check, autotest): nothing may
 // escape into foobar2000, including std::bad_alloc, so a failure ends as a row.
 std::vector<CheckResult> RunUpdateCheck(
     std::vector<InstalledComponentInfo> const& installed,

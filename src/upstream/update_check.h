@@ -71,7 +71,7 @@ bool TryBeginUpdateCheck();
 void EndUpdateCheck();
 bool IsUpdateCheckRunning();
 // Id of the check begun last (1, 2, ...), unique for the process. Results are delivered
-// to the window attached to that id, whichever kind of check it was.
+// to the Component Updates page attached to that id, whichever kind of check it was.
 int64_t CurrentUpdateCheckId();
 
 #ifdef FCU_DEBUG_HOOKS

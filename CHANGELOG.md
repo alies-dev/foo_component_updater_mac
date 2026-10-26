@@ -13,6 +13,7 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 ### Changed
 
 * Preferences explain "Include prereleases" under the checkbox.
+* The update list moved from its own window into Preferences > Tools > Component Updates, with the same columns as foobar2000's Components page: Name, Version, Module and Status. Latest, Released and Notes are gone: the version, date and notes are in the Status tooltip, and a double click opens the release page. The page is headed "Third-Party Component Updates" and says that foobar2000 and its built in components are updated with foobar2000 itself; the Help command is now **Check for Third-Party Component Updates...** and the built in components checkbox reads "Show built in components (updated with foobar2000)".
 
 ### Removed
 

@@ -34,7 +34,7 @@ void start() {
 #ifdef FCU_DEBUG_HOOKS
         ++g_ticks;
 #endif
-        // Same rules as the startup evaluation: enabled, interval elapsed, no running check, no open window.
+        // Same rules as the startup evaluation: enabled, interval elapsed, no running check, updates page not visible.
         EvaluateAutomaticCheck();
     }];
     g_timer.tolerance = period() * 0.1;
