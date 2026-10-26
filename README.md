@@ -86,6 +86,8 @@ The updater knows the GitHub repository of these components, so it finds their u
 | [foo_cyan_leaf](https://github.com/CyanLeafcomponent/cyan-leaf-downloads) | Built into the updater |
 | [foo_vis_projectMacOS](https://github.com/gabitoesmiapodo/projectMacOS) | Built into the updater |
 | [foo_richtext_mac](https://github.com/seongbin/foo_richtext_mac) | Built into the updater |
+| [foo_dms_browser](https://github.com/sunick2009/foo_upnp_mac) | Built into the updater |
+| [foo_lastfm](https://github.com/Scannou/foo-lastfm) | Built into the updater |
 
 *Declared by the component*: the component's `Info.plist` names its source (`FB2KUpdateSource`, see [docs/component-authors.md](docs/component-authors.md)). *Built into the updater*: the source is listed in [Resources/extra_components.json](Resources/extra_components.json), which ships with the updater.
 

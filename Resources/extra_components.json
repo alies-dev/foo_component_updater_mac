@@ -16,6 +16,8 @@
     { "dll": "foo_vis_projectm_mac", "source": "github", "owner": "Stwarf", "repo": "foo_vis_projectm_mac" },
     { "dll": "foo_cyan_leaf", "source": "github", "owner": "CyanLeafcomponent", "repo": "cyan-leaf-downloads" },
     { "dll": "foo_vis_projectMacOS", "source": "github", "owner": "gabitoesmiapodo", "repo": "projectMacOS" },
-    { "dll": "foo_richtext_mac", "source": "github", "owner": "seongbin", "repo": "foo_richtext_mac" }
+    { "dll": "foo_richtext_mac", "source": "github", "owner": "seongbin", "repo": "foo_richtext_mac" },
+    { "dll": "foo_dms_browser", "source": "github", "owner": "sunick2009", "repo": "foo_upnp_mac" },
+    { "dll": "foo_lastfm", "source": "github", "owner": "Scannou", "repo": "foo-lastfm" }
   ]
 }
