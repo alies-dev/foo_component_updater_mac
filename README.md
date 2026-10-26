@@ -69,6 +69,7 @@ The updater knows the GitHub repository of these components, so it finds their u
 | --- | --- |
 | [foo_ui_panels](https://github.com/santiagorod92/foo_ui_panels) | Declared by the component |
 | [foo_navidrome](https://github.com/santiagorod92/foo_navidrome) | Declared by the component |
+| [foo_dsd_output](https://github.com/dingql/foobar2000_dsd_mac) | Declared by the component |
 | [foo_jl_album_art](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
 | [foo_jl_biography](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
 | [foo_jl_effects_dsp](https://github.com/JendaT/fb2k-components-mac-suite) | Built into the updater |
