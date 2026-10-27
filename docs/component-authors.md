@@ -2,13 +2,24 @@
 
 This updater finds new versions of third party foobar2000 components. These guidelines make yours easy to find and compare.
 
-## Recommended: get listed in the official repository
+## Two ways to publish, best used together
+
+There are two ways to reach users. They work side by side.
+
+* The official repository reaches everyone who browses it. A listing needs Peter to approve your account by hand, and that can take a while.
+* Your own releases on GitHub (or GitLab, Codeberg, ...) work from your first release, with nobody's approval.
+
+Peter has [announced](https://hydrogenaudio.org/index.php/topic,130098.0.html) that foobar2000 for Mac will get its own updater for components hosted on foobar2000.org. It won't read GitHub or `FB2KUpdateSource`: this updater stays for those.
+
+<a id="recommended-get-listed-in-the-official-repository"></a>
+
+## The official repository
 
 foobar2000 has an official component repository, [foobar2000.org/components](https://www.foobar2000.org/components/system/mac), with a macOS section. To get a component listed there, register on the Hydrogenaudio forum and contact [Peter](https://hydrogenaud.io/index.php?action=profile;u=84), the foobar2000 developer, with information about your component ([foobar2000 developer documentation](https://www.foobar2000.org/RTFM), "Getting a component listed on foobar2000.org/components").
 
-A listing reaches everyone who browses the repository, and this updater needs nothing else: it finds a listed component by its file name at `https://www.foobar2000.org/components/view/<file name>` when the listing names macOS under "Supported system" or "Supported systems", compares the version shown there with the installed one and installs the package from it. Keep the version on the listing equal to `DECLARE_COMPONENT_VERSION`, and the package in the layout described below (`mac/<file name>.component`, signed, same `CFBundleIdentifier` as before).
+This updater needs nothing else for a listed component. It finds it by its file name at `https://www.foobar2000.org/components/view/<file name>` when the listing names macOS under "Supported system" or "Supported systems". It compares the version shown there with the installed one and installs the package from it. Keep the version on the listing equal to `DECLARE_COMPONENT_VERSION`, and the package in the layout described below (`mac/<file name>.component`, signed, same `CFBundleIdentifier` as before).
 
-## Fallback: publish on GitHub
+## Your own releases on GitHub
 
 For components that are not in the official repository (yet), or whose updates appear on GitHub first, the updater reads GitHub releases. Together with the `FB2KUpdateSource` key below this needs nobody's list:
 

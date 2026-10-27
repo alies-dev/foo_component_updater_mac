@@ -48,7 +48,12 @@ cp -R foo_component_updater_mac/backup/foo_component_updater_mac/foo_component_u
 
 ## For component authors
 
-The recommended way to reach users is the official component repository, [foobar2000.org/components](https://www.foobar2000.org/components/system/mac): register on the Hydrogenaudio forum and contact Peter, the foobar2000 developer, to get a component listed ([how](https://www.foobar2000.org/RTFM)). This updater finds listed macOS components by file name with nothing else to do. Components that are not listed there are found as a fallback through their GitHub releases and an `FB2KUpdateSource` key in their `Info.plist`; see [docs/component-authors.md](docs/component-authors.md).
+There are two ways to reach users. Both work with this updater, and they can be used together.
+
+* The official component repository, [foobar2000.org/components](https://www.foobar2000.org/components/system/mac). Register on the Hydrogenaudio forum and contact Peter, the foobar2000 developer, to get a component listed ([how](https://www.foobar2000.org/RTFM)). Listing needs his manual approval, which can take a while. This updater finds listed macOS components by file name, with nothing else to do.
+* Your own GitHub releases and an `FB2KUpdateSource` key in the component's `Info.plist`. This works from the first release, with nobody's approval.
+
+See [docs/component-authors.md](docs/component-authors.md).
 
 ## Development
 
